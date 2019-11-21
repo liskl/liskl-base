@@ -35,14 +35,14 @@ jobs:
           entrypoint: /entrypoint.sh
           args: build Dockerfile
 
-#      - name: Container Push
-#        uses: "./.github/actions/docker"
-#        env:
-#          OWNER: liskl
-#          DOCKER_IMAGE: 'liskl-base'
-#          DOCKER_REGISTRY: 'registry.infra.liskl.com'
-#          DOCKER_USERNAME: 'liskl'
-#          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-#        with:
-#          entrypoint: /entrypoint.sh
-#          args: push
+      - name: Container Push
+        uses: "./.github/actions/docker"
+        env:
+          OWNER: liskl
+          DOCKER_IMAGE: 'liskl-base'
+          DOCKER_REGISTRY: 'registry.infra.liskl.com'
+          DOCKER_USERNAME: 'liskl'
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          entrypoint: /entrypoint.sh
+          args: push

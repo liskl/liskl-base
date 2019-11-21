@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+
+jobs:
+
+  build-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v1
+
+      - name: Container Build
+        uses: "./.github/actions/docker"
+        env:
+          OWNER: liskl
+          DOCKER_IMAGE: 'liskl-base'
+          DOCKER_REGISTRY: 'registry.infra.liskl.com'
+          DOCKER_USERNAME: 'liskl'
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          entrypoint: /entrypoint.sh
+          args: build Dockerfile
+
+      - name: Container Push
+        uses: "./.github/actions/docker"
+        env:
+          OWNER: liskl
+          DOCKER_IMAGE: 'liskl-base'
+          DOCKER_REGISTRY: 'registry.infra.liskl.com'
+          DOCKER_USERNAME: 'liskl'
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        with:
+          entrypoint: /entrypoint.sh
+          args: push

@@ -12,7 +12,7 @@ echo "GITHUB_TAGS: $(git describe --tags)";
 if [[ "${GITHUB_REF}" == "refs/tags/master" ]]; then
     DOCKER_TAG="$(git describe --tags)"
 elif [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
-    DOCKER_TAG="$(git describe --tags)"
+    DOCKER_TAG="$(echo ${GITHUB_SHA::7})"
 elif [[ "${GITHUB_REF}" == "refs/tags"* ]]; then
     DOCKER_TAG="$(echo ${GITHUB_REF} | rev | cut -d/ -f1 | rev)"
 elif [[ "${GITHUB_REF}" == "refs/pull"* ]]; then

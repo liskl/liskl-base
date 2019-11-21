@@ -26,8 +26,7 @@ if [[ "${DOCKER_REGISTRY}" == "docker.pkg.github.com" ]]; then
   NEW_NAME="${OWNER}/${DOCKER_IMAGE}/${DOCKER_IMAGE}";
   DOCKER_IMAGE="${NEW_NAME}"
 else
-  true;
-  #DOCKER_IMAGE="${OWNER}/${DOCKER_IMAGE}"
+  DOCKER_IMAGE="${OWNER}/${DOCKER_IMAGE}"
 fi
 
 if [[ "$1" == "build" ]]; then

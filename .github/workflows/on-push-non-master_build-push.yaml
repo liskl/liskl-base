@@ -16,7 +16,7 @@ jobs:
       id: extract_branch
       run: echo "::set-env name=BRANCH::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
     - name: Publish to Registry
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@2.16
       with:
         name: liskl/base
         username: ${{ secrets.DOCKER_USERNAME }}

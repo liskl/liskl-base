@@ -13,8 +13,14 @@ This project creates lightweight, security-focused base Docker images using Alpi
 - **3.22.1** - Latest stable release (tagged as `latest`)
 
 ### Architectures
+- **linux/386** (x86)
 - **linux/amd64** (x86_64)
+- **linux/arm/v6** (armv7)
 - **linux/arm/v7** (armhf)
+- **linux/arm64/v8** (aarch64)
+- **linux/ppc64le** (ppc64le)
+- **linux/s390x** (s390x)
+- **linux/riscv64** (riscv64) - Alpine 3.20+ only
 
 ## Image Tags
 
@@ -88,9 +94,16 @@ docker build --platform linux/arm/v7 --build-arg alpine_version=3.22.1 -t liskl/
 # Setup buildx (one time)
 docker buildx create --use
 
-# Build and push multi-platform image
+# Build and push multi-platform image (all architectures)
 docker buildx build \
-  --platform linux/amd64,linux/arm/v7 \
+  --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x,linux/riscv64 \
+  --build-arg alpine_version=3.22.1 \
+  -t liskl/base:alpine-3.22.1 \
+  --push .
+
+# Build for specific architectures only
+docker buildx build \
+  --platform linux/amd64,linux/arm64/v8 \
   --build-arg alpine_version=3.22.1 \
   -t liskl/base:alpine-3.22.1 \
   --push .
@@ -107,8 +120,8 @@ This repository uses GitHub Actions for automated building and publishing:
 ### Build Matrix
 Each workflow run builds:
 - 9 Alpine versions (3.14.3 through 3.22.1)
-- 2 architectures (amd64, arm/v7)
-- **Total**: 18 images per workflow run
+- 7-8 architectures (7 base + 1 conditional riscv64 for Alpine 3.20+)
+- **Total**: 63-66 images per workflow run
 
 ## Image Details
 
@@ -127,8 +140,14 @@ docker run --rm liskl/base:alpine-3.22.1 cat /etc/build_release
 
 ### Image Sizes
 Typical compressed image sizes:
+- **386**: ~2.4MB
 - **amd64**: ~2.7MB
+- **arm/v6**: ~2.4MB
 - **arm/v7**: ~2.5MB
+- **arm64/v8**: ~2.6MB
+- **ppc64le**: ~2.7MB
+- **s390x**: ~2.4MB
+- **riscv64**: ~3.4MB
 
 ## Security
 

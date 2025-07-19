@@ -57,3 +57,33 @@ The resulting Docker image:
 - Sets environment variables for build tracking
 - Default entrypoint: `/bin/sh`
 - Includes build metadata in `/etc/build_release`
+
+## Commit Message Format
+
+This project uses commitlint-compatible commit messages. Follow the conventional commits specification:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks, dependencies, etc.
+- `ci`: CI/CD configuration changes
+
+### Examples
+```
+feat: add support for Alpine 3.15
+fix: correct armhf build argument handling
+docs: update README with new build instructions
+ci: migrate workflows to Docker Hub
+```

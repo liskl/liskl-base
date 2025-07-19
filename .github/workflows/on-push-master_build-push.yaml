@@ -30,8 +30,8 @@ jobs:
         platforms: linux/amd64
         push: true
         tags: |
-          liskl/base:alpine-${{ matrix.alpine_version }}
-          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest' || '' }}
+          liskl/base:alpine-${{ matrix.alpine_version }}-amd64
+          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-amd64' || '' }}
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.BRANCH }}
@@ -44,10 +44,23 @@ jobs:
         platforms: linux/arm/v7
         push: true
         tags: |
-          liskl/base:alpine-${{ matrix.alpine_version }}
-          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest' || '' }}
+          liskl/base:alpine-${{ matrix.alpine_version }}-arm
+          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-arm' || '' }}
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.BRANCH }}
           alpine_version=${{ matrix.alpine_version }}
           ALPINE_ARCH=armhf
+    - name: Create and push multi-platform manifest
+      run: |
+        docker manifest create liskl/base:alpine-${{ matrix.alpine_version }} \
+          liskl/base:alpine-${{ matrix.alpine_version }}-amd64 \
+          liskl/base:alpine-${{ matrix.alpine_version }}-arm
+        docker manifest push liskl/base:alpine-${{ matrix.alpine_version }}
+        
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          docker manifest create liskl/base:latest \
+            liskl/base:latest-amd64 \
+            liskl/base:latest-arm
+          docker manifest push liskl/base:latest
+        fi

@@ -30,7 +30,7 @@ jobs:
         platforms: linux/amd64
         push: true
         tags: |
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.SHORT_SHA }}
@@ -43,9 +43,15 @@ jobs:
         platforms: linux/arm/v7
         push: true
         tags: |
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.SHORT_SHA }}
           alpine_version=${{ matrix.alpine_version }}
           ALPINE_ARCH=armhf
+    - name: Create and push multi-platform manifest
+      run: |
+        docker manifest create liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64 \
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm
+        docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}

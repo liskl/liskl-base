@@ -29,6 +29,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64
         build-args: |
@@ -42,6 +44,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm
         build-args: |

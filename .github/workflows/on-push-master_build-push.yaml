@@ -29,6 +29,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-amd64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-amd64' || '' }}
@@ -43,6 +45,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-arm
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-arm' || '' }}

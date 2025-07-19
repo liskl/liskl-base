@@ -24,6 +24,12 @@ jobs:
       id: extract_branch
       run: echo "BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_ENV
     
+    # Install tools for SBOM generation and attestation
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+    - name: Install syft for SBOM generation
+      uses: anchore/sbom-action/download-syft@v0
+    
     # Build all base architectures (available for all Alpine versions)
     - name: Build and push linux/386 image
       uses: docker/build-push-action@v5
@@ -213,4 +219,55 @@ jobs:
             liskl/base:latest-s390x \
             liskl/base:latest-riscv64
           docker manifest push liskl/base:latest
+        fi
+    
+    # Generate SBOM and attach as attestation
+    - name: Generate and attach SBOM
+      run: |
+        # Generate SBOM for the multi-platform image
+        echo "Generating SBOM for liskl/base:alpine-${{ matrix.alpine_version }}"
+        syft liskl/base:alpine-${{ matrix.alpine_version }} \
+          --output spdx-json \
+          --file /tmp/sbom-${{ matrix.alpine_version }}.spdx.json
+        
+        # Also generate CycloneDX format for broader tool compatibility
+        syft liskl/base:alpine-${{ matrix.alpine_version }} \
+          --output cyclonedx-json \
+          --file /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json
+        
+        # Upload SBOM as attestation using cosign (keyless signing)
+        cosign attest --yes \
+          --predicate /tmp/sbom-${{ matrix.alpine_version }}.spdx.json \
+          --type spdx \
+          liskl/base:alpine-${{ matrix.alpine_version }}
+        
+        # Also attach CycloneDX SBOM
+        cosign attest --yes \
+          --predicate /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json \
+          --type cyclonedx \
+          liskl/base:alpine-${{ matrix.alpine_version }}
+        
+        # Generate SBOM for latest tag (Alpine 3.22.1 only)
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          echo "Generating SBOM for liskl/base:latest"
+          
+          # Generate SBOMs for latest tag
+          syft liskl/base:latest \
+            --output spdx-json \
+            --file /tmp/sbom-latest.spdx.json
+          
+          syft liskl/base:latest \
+            --output cyclonedx-json \
+            --file /tmp/sbom-latest.cyclonedx.json
+          
+          # Attach SBOMs to latest tag
+          cosign attest --yes \
+            --predicate /tmp/sbom-latest.spdx.json \
+            --type spdx \
+            liskl/base:latest
+          
+          cosign attest --yes \
+            --predicate /tmp/sbom-latest.cyclonedx.json \
+            --type cyclonedx \
+            liskl/base:latest
         fi

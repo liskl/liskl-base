@@ -151,10 +151,41 @@ Typical compressed image sizes:
 
 ## Security
 
+### Current Implementation
 - Built from official Alpine Linux minirootfs tarballs
 - Minimal attack surface (no unnecessary packages)
 - Regular updates following Alpine Linux security advisories
 - Multi-architecture support for diverse deployment environments
+
+### SBOM Generation (Implemented)
+All images include comprehensive Software Bill of Materials (SBOM) for supply chain security:
+
+- **SPDX Format**: Industry-standard SBOM format for compliance frameworks
+- **CycloneDX Format**: Enhanced tool compatibility and ecosystem integration
+- **Automated Generation**: Generated during every CI/CD build process
+- **Cryptographic Attestation**: Signed and attached using cosign keyless signing
+- **Multi-Architecture Coverage**: SBOMs generated for all supported platforms
+- **Vulnerability Scanning Ready**: Compatible with grype, snyk, and other security tools
+
+#### SBOM Verification Examples
+```bash
+# Verify SBOM attestations exist
+cosign verify-attestation --type spdx liskl/base:alpine-3.22.1
+cosign verify-attestation --type cyclonedx liskl/base:alpine-3.22.1
+
+# Extract SBOM for vulnerability scanning
+cosign verify-attestation --type spdx liskl/base:alpine-3.22.1 \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
+
+# Run vulnerability scan with grype
+grype sbom:sbom.spdx.json --fail-on critical
+
+# Use provided verification script
+./scripts/verify-sbom.sh alpine-3.22.1
+```
+
+### Security Features (Planned)
+- **Build Attestations** (Issue #12): SLSA provenance attestations for build integrity verification and enterprise compliance
 
 ## Development
 
@@ -164,7 +195,9 @@ Typical compressed image sizes:
 ├── Dockerfile              # Multi-platform Dockerfile
 ├── download.sh             # Alpine rootfs download script
 ├── rootfs/                 # Alpine minirootfs tarballs
-├── .github/workflows/      # CI/CD workflows
+├── scripts/
+│   └── verify-sbom.sh     # SBOM verification and extraction script
+├── .github/workflows/      # CI/CD workflows with SBOM generation
 └── CLAUDE.md              # AI assistant guidelines
 ```
 

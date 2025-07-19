@@ -24,6 +24,12 @@ jobs:
       id: get_sha
       run: echo "SHORT_SHA=$(echo ${GITHUB_SHA:0:7})" >> $GITHUB_ENV
     
+    # Install tools for SBOM generation and attestation
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+    - name: Install syft for SBOM generation
+      uses: anchore/sbom-action/download-syft@v0
+    
     # Build all base architectures (available for all Alpine versions)
     - name: Build and push linux/386 image
       uses: docker/build-push-action@v5
@@ -175,3 +181,29 @@ jobs:
         fi
         
         docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+    
+    # Generate SBOM and attach as attestation for development images
+    - name: Generate and attach SBOM
+      run: |
+        # Generate SBOM for the development multi-platform image
+        echo "Generating SBOM for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
+        syft liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
+          --output spdx-json \
+          --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json
+        
+        # Also generate CycloneDX format for broader tool compatibility
+        syft liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
+          --output cyclonedx-json \
+          --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json
+        
+        # Upload SBOM as attestation using cosign (keyless signing)
+        cosign attest --yes \
+          --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json \
+          --type spdx \
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+        
+        # Also attach CycloneDX SBOM
+        cosign attest --yes \
+          --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json \
+          --type cyclonedx \
+          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}

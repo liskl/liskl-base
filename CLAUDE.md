@@ -75,6 +75,34 @@ The resulting Docker image:
 - Sets environment variables for build tracking
 - Default entrypoint: `/bin/sh`
 - Includes build metadata in `/etc/build_release`
+- Enhanced with SBOM generation and security attestations
+
+## Security Features
+
+### SBOM Generation (Implemented)
+- **SPDX format**: Industry-standard SBOM format for compliance
+- **CycloneDX format**: Enhanced tool compatibility and ecosystem support  
+- **Automated generation**: Generated for every image during CI/CD builds
+- **Cosign attestation**: Cryptographically signed and attached to images
+- **Multi-architecture coverage**: SBOMs for all supported platforms
+- **Vulnerability ready**: Compatible with grype, snyk, and other scanners
+
+### Security Verification
+```bash
+# Verify SBOM attestations
+cosign verify-attestation --type spdx liskl/base:alpine-3.22.1
+cosign verify-attestation --type cyclonedx liskl/base:alpine-3.22.1
+
+# Extract SBOM for vulnerability scanning
+cosign verify-attestation --type spdx liskl/base:alpine-3.22.1 \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
+
+# Run vulnerability scan
+grype sbom:sbom.spdx.json --fail-on critical
+
+# Use verification script
+./scripts/verify-sbom.sh alpine-3.22.1
+```
 
 ## Commit Message Format
 

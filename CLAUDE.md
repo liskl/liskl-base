@@ -80,16 +80,18 @@ The resulting Docker image:
 ## Security Features
 
 ### SBOM Generation (Implemented)
-- **SPDX format**: Industry-standard SBOM format for compliance
-- **CycloneDX format**: Enhanced tool compatibility and ecosystem support  
+- **Dual attestation strategy**: Both BuildKit and cosign SBOM attestations
+- **BuildKit SBOMs**: Native Docker Hub format for automatic indexing and compliance display
+- **Cosign SBOMs**: SPDX and CycloneDX formats for external tool compatibility
 - **Automated generation**: Generated for every image during CI/CD builds
-- **Cosign attestation**: Cryptographically signed using image digests (not tags)
 - **Multi-architecture coverage**: SBOMs for all supported platforms
 - **Vulnerability ready**: Compatible with grype, snyk, and other scanners
 - **Secure signing**: Uses image digests to prevent tag substitution attacks
 
 ### Build Attestations (Implemented)
-- **SLSA provenance**: Complete build integrity and source traceability
+- **Dual attestation strategy**: Both BuildKit and cosign SLSA provenance attestations
+- **BuildKit provenance**: Native Docker Hub format for automatic compliance display
+- **Cosign provenance**: Detailed SLSA v0.2 format with comprehensive build metadata
 - **Supply chain transparency**: Full documentation of build process and materials
 - **GitHub Actions integration**: Captures complete build environment details
 - **Enterprise compliance**: Meets NIST and EU Cyber Resilience Act requirements
@@ -98,12 +100,16 @@ The resulting Docker image:
 
 ### Security Verification
 ```bash
-# Verify SBOM attestations (requires cosign.pub public key)
+# Verify cosign SBOM attestations (requires cosign.pub public key)
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
 cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
 
-# Verify SLSA provenance attestation
+# Verify cosign SLSA provenance attestation
 cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1
+
+# View BuildKit attestations (automatically generated and visible on Docker Hub)
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .Provenance}}'
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .SBOM}}'
 
 # Extract SBOM for vulnerability scanning
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 \

@@ -25,6 +25,7 @@ jobs:
       run: echo "BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_ENV
     
     # Install tools for SBOM generation and attestation
+    # Dual attestation strategy: BuildKit for Docker Hub compliance + cosign for verification
     - name: Install cosign
       uses: sigstore/cosign-installer@v3
     - name: Install syft for SBOM generation
@@ -38,8 +39,8 @@ jobs:
         context: .
         platforms: linux/386
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-386
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-386' || '' }}
@@ -55,8 +56,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-amd64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-amd64' || '' }}
@@ -72,8 +73,8 @@ jobs:
         context: .
         platforms: linux/arm/v6
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-armv6
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-armv6' || '' }}
@@ -89,8 +90,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-armv7
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-armv7' || '' }}
@@ -106,8 +107,8 @@ jobs:
         context: .
         platforms: linux/arm64/v8
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-arm64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-arm64' || '' }}
@@ -123,8 +124,8 @@ jobs:
         context: .
         platforms: linux/ppc64le
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-ppc64le
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-ppc64le' || '' }}
@@ -140,8 +141,8 @@ jobs:
         context: .
         platforms: linux/s390x
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-s390x
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-s390x' || '' }}
@@ -159,8 +160,8 @@ jobs:
         context: .
         platforms: linux/riscv64
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-riscv64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-riscv64' || '' }}
@@ -263,7 +264,7 @@ jobs:
           echo "Latest digest: ${LATEST_DIGEST}"
         fi
     
-    # Generate SBOM and attach as attestation
+    # Generate additional cosign SBOM attestations (BuildKit SBOMs are automatically generated above)
     - name: Generate and attach SBOM
       env:
         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
@@ -369,7 +370,7 @@ jobs:
           fi
         fi
     
-    # Generate SLSA provenance attestation
+    # Generate additional cosign SLSA provenance attestations (BuildKit provenance is automatically generated above)
     - name: Generate and attach SLSA provenance
       env:
         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

@@ -25,6 +25,7 @@ jobs:
       run: echo "SHORT_SHA=$(echo ${GITHUB_SHA:0:7})" >> $GITHUB_ENV
     
     # Install tools for SBOM generation and attestation
+    # Dual attestation strategy: BuildKit for Docker Hub compliance + cosign for verification
     - name: Install cosign
       uses: sigstore/cosign-installer@v3
     - name: Install syft for SBOM generation
@@ -37,8 +38,8 @@ jobs:
         context: .
         platforms: linux/386
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-386
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -52,8 +53,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -67,8 +68,8 @@ jobs:
         context: .
         platforms: linux/arm/v6
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv6
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -82,8 +83,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv7
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -97,8 +98,8 @@ jobs:
         context: .
         platforms: linux/arm64/v8
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -112,8 +113,8 @@ jobs:
         context: .
         platforms: linux/ppc64le
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-ppc64le
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -127,8 +128,8 @@ jobs:
         context: .
         platforms: linux/s390x
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-s390x
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -144,8 +145,8 @@ jobs:
         context: .
         platforms: linux/riscv64
         push: true
-        provenance: false
-        sbom: false
+        provenance: true
+        sbom: true
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-riscv64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -204,7 +205,7 @@ jobs:
         echo "MANIFEST_DIGEST=${DIGEST}" >> $GITHUB_ENV
         echo "Development image digest: ${DIGEST}"
     
-    # Generate SBOM and attach as attestation for development images
+    # Generate additional cosign SBOM attestations for development images (BuildKit SBOMs are automatically generated above)
     - name: Generate and attach SBOM
       env:
         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
@@ -264,7 +265,7 @@ jobs:
           echo "✓ CycloneDX SBOM attestation created"
         fi
     
-    # Generate SLSA provenance attestation for development images
+    # Generate additional cosign SLSA provenance attestations for development images (BuildKit provenance is automatically generated above)
     - name: Generate and attach SLSA provenance
       env:
         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

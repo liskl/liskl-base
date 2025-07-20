@@ -179,7 +179,7 @@ jobs:
       run: |
         # Get digest for the development multi-platform manifest (works for both new and existing manifests)
         echo "Retrieving manifest digest for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
-        DIGEST=$(docker buildx imagetools inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}' 2>/dev/null || docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null)
+        DIGEST=$(docker buildx imagetools inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} --format '{{json .}}' | jq -r '.manifest.digest')
         
         if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
           echo "Error: Could not retrieve digest for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"

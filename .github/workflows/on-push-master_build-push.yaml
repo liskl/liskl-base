@@ -464,7 +464,7 @@ jobs:
               }]
             }
           }
-          EOF
+EOF
         
           # Attach SLSA provenance attestation
           cosign attest --yes \

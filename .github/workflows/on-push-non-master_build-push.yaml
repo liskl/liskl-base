@@ -75,7 +75,7 @@ jobs:
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.SHORT_SHA }}
           alpine_version=${{ matrix.alpine_version }}
-          ALPINE_ARCH=armhf
+          ALPINE_ARCH=armv7
     
     - name: Build and push linux/arm/v7 image
       uses: docker/build-push-action@v5
@@ -90,7 +90,7 @@ jobs:
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.SHORT_SHA }}
           alpine_version=${{ matrix.alpine_version }}
-          ALPINE_ARCH=armv7
+          ALPINE_ARCH=armhf
     
     - name: Build and push linux/arm64/v8 image
       uses: docker/build-push-action@v5

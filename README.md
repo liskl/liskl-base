@@ -189,10 +189,12 @@ grype sbom:sbom.spdx.json --fail-on critical
 
 #### Required Setup
 1. **Generate Key Pair**: Run `./scripts/generate-cosign-keys.sh` to create signing keys
-2. **Add GitHub Secrets**:
+2. **Add GitHub Secrets** (Settings > Secrets and variables > Actions > Secrets):
    - `COSIGN_PRIVATE_KEY`: Contents of generated `cosign.key` file
    - `COSIGN_PASSWORD`: Password used during key generation
-3. **Public Verification**: Share `cosign.pub` for SBOM verification
+3. **Add GitHub Variables** (Settings > Secrets and variables > Actions > Variables):
+   - `COSIGN_PUBLIC_KEY`: Contents of generated `cosign.pub` file
+4. **Public Verification**: The public key is automatically available for verification
 
 ### Security Features (Planned)
 - **Build Attestations** (Issue #12): SLSA provenance attestations for build integrity verification and enterprise compliance

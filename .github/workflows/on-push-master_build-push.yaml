@@ -243,7 +243,14 @@ jobs:
       env:
         COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        COSIGN_PUBLIC_KEY: ${{ vars.COSIGN_PUBLIC_KEY }}
       run: |
+        # Create public key file for verification reference
+        if [ -n "${COSIGN_PUBLIC_KEY}" ]; then
+          echo "${COSIGN_PUBLIC_KEY}" > cosign.pub
+          echo "✓ Public key available for verification"
+        fi
+        
         # Generate SBOM for the multi-platform image using digest
         IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
         echo "Generating SBOM for ${IMAGE_WITH_DIGEST}"

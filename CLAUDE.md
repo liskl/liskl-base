@@ -108,10 +108,14 @@ grype sbom:sbom.spdx.json --fail-on critical
 ./scripts/generate-cosign-keys.sh
 ```
 
-### Required GitHub Secrets
+### Required GitHub Configuration
+
+#### GitHub Secrets (Private)
 - **COSIGN_PRIVATE_KEY**: Private key for signing SBOMs (from cosign.key)
 - **COSIGN_PASSWORD**: Password for the private key
-- **COSIGN_PUBLIC_KEY** (optional): Public key for verification documentation
+
+#### GitHub Variables (Public)
+- **COSIGN_PUBLIC_KEY**: Public key for verification (from cosign.pub)
 
 ## Commit Message Format
 

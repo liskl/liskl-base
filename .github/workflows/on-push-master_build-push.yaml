@@ -31,61 +31,42 @@ jobs:
     # Check if tags are immutable and already exist on Docker Hub
     - name: Check immutable tag status
       id: check_tags
+      env:
+        DEBUG: ${{ runner.debug == '1' && 'true' || 'false' }}
       run: |
-        echo "Checking immutable tag status for alpine-${{ matrix.alpine_version }}"
-        
         # Prepare tags to check
         TAGS_TO_CHECK="alpine-${{ matrix.alpine_version }}"
         if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
           TAGS_TO_CHECK="$TAGS_TO_CHECK latest"
         fi
         
-        # Check each tag
-        SHOULD_SKIP_ALPINE="false"
-        SHOULD_SKIP_LATEST="false"
+        echo "::notice::Checking immutable tag status for: $TAGS_TO_CHECK"
         
-        for tag in $TAGS_TO_CHECK; do
-          echo "::group::Checking tag: $tag"
-          if ./scripts/check-immutable-tags.sh --quiet "$tag"; then
-            echo "✅ Tag $tag: Can push (safe)"
-            if [ "$tag" = "latest" ]; then
-              echo "should_push_latest=true" >> $GITHUB_OUTPUT
-            else
-              echo "should_push_alpine=true" >> $GITHUB_OUTPUT
-            fi
-          else
-            exit_code=$?
-            if [ $exit_code -eq 1 ]; then
-              echo "⚠️ Tag $tag: Skipping (immutable and exists)"
-              if [ "$tag" = "latest" ]; then
-                SHOULD_SKIP_LATEST="true"
-                echo "should_push_latest=false" >> $GITHUB_OUTPUT
-              else
-                SHOULD_SKIP_ALPINE="true" 
-                echo "should_push_alpine=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "❌ Tag $tag: API error (exit code: $exit_code)"
-              echo "::error::Failed to check tag $tag (API error)"
-              exit 1
-            fi
-          fi
-          echo "::endgroup::"
-        done
-        
-        # Set overall push decision
-        if [ "$SHOULD_SKIP_ALPINE" = "true" ] && [ "$SHOULD_SKIP_LATEST" = "true" ]; then
-          echo "should_push=false" >> $GITHUB_OUTPUT
-          echo "::notice::Skipping all pushes - both alpine-${{ matrix.alpine_version }} and latest exist"
-        elif [ "$SHOULD_SKIP_ALPINE" = "true" ]; then
-          echo "should_push=false" >> $GITHUB_OUTPUT  
-          echo "::notice::Skipping push - alpine-${{ matrix.alpine_version }} exists and is immutable"
-        else
+        # Use enhanced logging script with GitHub Actions integration
+        if ./scripts/check-immutable-tags.sh $TAGS_TO_CHECK; then
           echo "should_push=true" >> $GITHUB_OUTPUT
-          if [ "$SHOULD_SKIP_LATEST" = "true" ]; then
-            echo "::notice::Will push alpine-${{ matrix.alpine_version }} but skip latest (exists)"
+          echo "should_push_alpine=true" >> $GITHUB_OUTPUT
+          if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+            echo "should_push_latest=true" >> $GITHUB_OUTPUT
+          fi
+        else
+          exit_code=$?
+          if [ $exit_code -eq 1 ]; then
+            # Some tags should be skipped - check which ones
+            if ./scripts/check-immutable-tags.sh alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
+              # Alpine tag is OK, latest might be the issue
+              echo "should_push=true" >> $GITHUB_OUTPUT
+              echo "should_push_alpine=true" >> $GITHUB_OUTPUT
+              echo "should_push_latest=false" >> $GITHUB_OUTPUT
+            else
+              # Alpine tag should be skipped
+              echo "should_push=false" >> $GITHUB_OUTPUT
+              echo "should_push_alpine=false" >> $GITHUB_OUTPUT
+              echo "should_push_latest=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "::notice::Will push all tags (safe to proceed)"
+            echo "::error::API error occurred during tag checking (exit code: $exit_code)"
+            exit 1
           fi
         fi
     

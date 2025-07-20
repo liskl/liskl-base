@@ -1,6 +1,6 @@
 FROM scratch
 
-MAINTAINER loren.lisk@liskl.com
+LABEL maintainer="loren.lisk@liskl.com"
 
 ARG RELEASE_VERSION=unknown
 ARG BRANCH=unknown

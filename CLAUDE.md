@@ -156,7 +156,13 @@ The project includes protection for immutable Docker Hub tags to prevent acciden
 
 - **Protected Pattern**: `^alpine-[0-9]+\.[0-9]+\.[0-9]+$` (e.g., `alpine-3.22.1`, `alpine-3.21.4`)
 - **Detection Script**: `scripts/check-immutable-tags.sh` validates tags before push operations
-- **CI/CD Integration**: Workflows use the detection script to skip protected tags gracefully
+- **CI/CD Integration**: Workflows automatically check tag status and skip protected tags gracefully
+
+#### CI/CD Workflow Behavior
+- **Master Branch**: Checks each `alpine-X.Y.Z` tag before building; skips existing immutable tags
+- **Feature Branches**: Safety verification ensures commit-prefixed tags don't conflict with immutable patterns
+- **Graceful Handling**: Failed tag checks don't fail the entire workflow; clear status messages provided
+- **Latest Tag**: Special handling for `latest` tag (only pushed with Alpine 3.22.1 if safe)
 
 #### Using Immutable Tag Detection
 ```bash

@@ -1,0 +1,72 @@
+{
+  "test_scenarios": [
+    {
+      "name": "all_tags_new",
+      "description": "All tags are new and can be pushed",
+      "tags": ["test-new-1", "test-new-2", "test-new-3"],
+      "expected_behavior": {
+        "should_push": true,
+        "push_count": 3,
+        "skip_count": 0,
+        "error_count": 0
+      }
+    },
+    {
+      "name": "mixed_immutable_mutable",
+      "description": "Mix of immutable existing and mutable new tags",
+      "tags": ["alpine-3.22.1", "test-new-tag", "522a89e-alpine-3.21.4"],
+      "expected_behavior": {
+        "should_push": "partial",
+        "push_count": 2,
+        "skip_count": 1,
+        "error_count": 0,
+        "notes": "alpine-3.22.1 should be skipped if it exists"
+      }
+    },
+    {
+      "name": "all_immutable_existing",
+      "description": "All tags are immutable and exist",
+      "tags": ["alpine-3.22.1", "alpine-3.21.4", "alpine-3.20.7"],
+      "expected_behavior": {
+        "should_push": false,
+        "push_count": 0,
+        "skip_count": 3,
+        "error_count": 0
+      }
+    },
+    {
+      "name": "api_failure_scenario",
+      "description": "API failures during tag checking",
+      "tags": ["alpine-3.22.1"],
+      "mock_api_failure": true,
+      "expected_behavior": {
+        "should_push": false,
+        "push_count": 0,
+        "skip_count": 0,
+        "error_count": 1,
+        "exit_code": 2
+      }
+    },
+    {
+      "name": "feature_branch_safety",
+      "description": "Feature branch tags should never conflict with immutable patterns",
+      "tags": ["522a89e-alpine-3.22.1", "abc123d-alpine-3.21.4"],
+      "expected_behavior": {
+        "should_push": true,
+        "push_count": 2,
+        "skip_count": 0,
+        "error_count": 0,
+        "notes": "Feature branch tags are always mutable by design"
+      }
+    },
+    {
+      "name": "latest_tag_handling",
+      "description": "Special handling for latest tag",
+      "tags": ["latest", "alpine-3.22.1"],
+      "expected_behavior": {
+        "should_push": "depends",
+        "notes": "Latest tag behavior depends on Alpine 3.22.1 availability"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": "UNAUTHORIZED",
+      "message": "authentication required",
+      "detail": null
+    }
+  ]
+}

@@ -206,34 +206,59 @@ jobs:
             liskl/base:alpine-${{ matrix.alpine_version }}-riscv64
         fi
         
-        docker manifest push liskl/base:alpine-${{ matrix.alpine_version }}
+        # Check if manifest already exists before pushing
+        if docker manifest inspect liskl/base:alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
+          echo "ℹ Manifest liskl/base:alpine-${{ matrix.alpine_version }} already exists, skipping push"
+        else
+          docker manifest push liskl/base:alpine-${{ matrix.alpine_version }}
+          echo "✓ Manifest liskl/base:alpine-${{ matrix.alpine_version }} pushed successfully"
+        fi
         
         # Create latest manifest for Alpine 3.22.1
         if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          docker manifest create liskl/base:latest \
-            liskl/base:latest-386 \
-            liskl/base:latest-amd64 \
-            liskl/base:latest-armv6 \
-            liskl/base:latest-armv7 \
-            liskl/base:latest-arm64 \
-            liskl/base:latest-ppc64le \
-            liskl/base:latest-s390x \
-            liskl/base:latest-riscv64
-          docker manifest push liskl/base:latest
+          if docker manifest inspect liskl/base:latest >/dev/null 2>&1; then
+            echo "ℹ Manifest liskl/base:latest already exists, skipping creation"
+          else
+            docker manifest create liskl/base:latest \
+              liskl/base:latest-386 \
+              liskl/base:latest-amd64 \
+              liskl/base:latest-armv6 \
+              liskl/base:latest-armv7 \
+              liskl/base:latest-arm64 \
+              liskl/base:latest-ppc64le \
+              liskl/base:latest-s390x \
+              liskl/base:latest-riscv64
+            docker manifest push liskl/base:latest
+            echo "✓ Manifest liskl/base:latest pushed successfully"
+          fi
         fi
     
     # Get manifest digest for secure signing
     - name: Get manifest digest
       id: digest
       run: |
-        # Get digest for the multi-platform manifest
-        DIGEST=$(docker manifest inspect liskl/base:alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}')
+        # Get digest for the multi-platform manifest (works for both new and existing manifests)
+        echo "Retrieving manifest digest for liskl/base:alpine-${{ matrix.alpine_version }}"
+        DIGEST=$(docker buildx imagetools inspect liskl/base:alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}' 2>/dev/null || docker manifest inspect liskl/base:alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null)
+        
+        if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+          echo "Error: Could not retrieve digest for liskl/base:alpine-${{ matrix.alpine_version }}"
+          exit 1
+        fi
+        
         echo "MANIFEST_DIGEST=${DIGEST}" >> $GITHUB_ENV
         echo "Image digest: ${DIGEST}"
         
         # Get digest for latest tag if this is Alpine 3.22.1
         if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          LATEST_DIGEST=$(docker manifest inspect liskl/base:latest | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:latest --format '{{.Manifest.Digest}}')
+          echo "Retrieving manifest digest for liskl/base:latest"
+          LATEST_DIGEST=$(docker buildx imagetools inspect liskl/base:latest --format '{{.Manifest.Digest}}' 2>/dev/null || docker manifest inspect liskl/base:latest | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null)
+          
+          if [ -z "$LATEST_DIGEST" ] || [ "$LATEST_DIGEST" = "null" ]; then
+            echo "Error: Could not retrieve digest for liskl/base:latest"
+            exit 1
+          fi
+          
           echo "LATEST_DIGEST=${LATEST_DIGEST}" >> $GITHUB_ENV
           echo "Latest digest: ${LATEST_DIGEST}"
         fi

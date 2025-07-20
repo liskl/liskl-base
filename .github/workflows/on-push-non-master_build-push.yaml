@@ -180,14 +180,27 @@ jobs:
             liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-riscv64
         fi
         
-        docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+        # Check if manifest already exists before pushing
+        if docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
+          echo "ℹ Manifest liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} already exists, skipping push"
+        else
+          docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+          echo "✓ Manifest liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} pushed successfully"
+        fi
     
     # Get manifest digest for secure signing
     - name: Get manifest digest
       id: digest
       run: |
-        # Get digest for the development multi-platform manifest
-        DIGEST=$(docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}')
+        # Get digest for the development multi-platform manifest (works for both new and existing manifests)
+        echo "Retrieving manifest digest for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
+        DIGEST=$(docker buildx imagetools inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}' 2>/dev/null || docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null)
+        
+        if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+          echo "Error: Could not retrieve digest for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
+          exit 1
+        fi
+        
         echo "MANIFEST_DIGEST=${DIGEST}" >> $GITHUB_ENV
         echo "Development image digest: ${DIGEST}"
     

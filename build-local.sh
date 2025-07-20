@@ -180,13 +180,69 @@ test_attestations() {
     
     # Test image functionality
     echo -e "${BLUE}Testing image functionality...${NC}"
-    # Test basic container startup and file access
-    if docker run --rm "$tag" test -f /etc/build_release >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ Image runs successfully and contains build metadata${NC}"
-    elif docker run --rm "$tag" >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ Image runs successfully${NC}"
+    
+    # Test 1: Basic container startup
+    if docker run --rm "$tag" >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Image starts successfully${NC}"
     else
-        echo -e "${RED}✗ Image failed to run${NC}"
+        echo -e "${RED}✗ Image failed to start${NC}"
+        return 1
+    fi
+    
+    # Test 2: Check build metadata exists
+    if docker run --rm --entrypoint="" "$tag" /bin/test -f /etc/build_release >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Build metadata file exists${NC}"
+    else
+        echo -e "${YELLOW}⚠ Build metadata file not found${NC}"
+    fi
+    
+    # Test 3: Execute echo command directly
+    echo_output=$(docker run --rm --entrypoint="" "$tag" /bin/echo "Hello from Alpine container" 2>/dev/null)
+    if [[ "$echo_output" == "Hello from Alpine container" ]]; then
+        echo -e "${GREEN}✓ Can execute echo commands inside container${NC}"
+    else
+        echo -e "${RED}✗ Failed to execute echo command inside container${NC}"
+        echo -e "${YELLOW}  Expected: 'Hello from Alpine container'${NC}"
+        echo -e "${YELLOW}  Got: '$echo_output'${NC}"
+    fi
+    
+    # Test 4: Check Alpine version info
+    alpine_version_output=$(docker run --rm --entrypoint="" "$tag" /bin/cat /etc/alpine-release 2>/dev/null || echo "not found")
+    if [[ "$alpine_version_output" != "not found" ]] && [[ -n "$alpine_version_output" ]]; then
+        echo -e "${GREEN}✓ Alpine version info accessible: ${alpine_version_output}${NC}"
+    else
+        echo -e "${YELLOW}⚠ Alpine version info not accessible${NC}"
+    fi
+    
+    # Test 5: Check basic shell utilities
+    if docker run --rm --entrypoint="" "$tag" /bin/test -x /bin/sh >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Shell (/bin/sh) is executable${NC}"
+    else
+        echo -e "${YELLOW}⚠ Shell (/bin/sh) not found or not executable${NC}"
+    fi
+    
+    # Test 6: Check build release content
+    build_info=$(docker run --rm --entrypoint="" "$tag" /bin/cat /etc/build_release 2>/dev/null | head -2)
+    if [[ -n "$build_info" ]]; then
+        echo -e "${GREEN}✓ Build release info accessible${NC}"
+        echo -e "${BLUE}  Build info: ${build_info//$'\n'/ | }${NC}"
+    else
+        echo -e "${YELLOW}⚠ Build release info not accessible${NC}"
+    fi
+    
+    # Test 7: Execute commands via shell entrypoint (real-world usage test)
+    shell_echo_output=$(docker run --rm "$tag" -c '/bin/echo "Shell entrypoint works"' 2>/dev/null)
+    if [[ "$shell_echo_output" == "Shell entrypoint works" ]]; then
+        echo -e "${GREEN}✓ Shell entrypoint executes commands correctly${NC}"
+    else
+        echo -e "${YELLOW}⚠ Shell entrypoint test failed (expected for minimal containers)${NC}"
+        # Try alternative shell test
+        alt_shell_test=$(echo '/bin/echo "Alt test"' | docker run --rm -i "$tag" 2>/dev/null)
+        if [[ "$alt_shell_test" == "Alt test" ]]; then
+            echo -e "${GREEN}✓ Shell accepts stdin commands${NC}"
+        else
+            echo -e "${YELLOW}⚠ Shell stdin test also failed${NC}"
+        fi
     fi
 }
 

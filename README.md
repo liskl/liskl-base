@@ -160,6 +160,27 @@ Typical compressed image sizes:
 - Regular updates following Alpine Linux security advisories
 - Multi-architecture support for diverse deployment environments
 
+### BuildKit Native Attestations
+All images include comprehensive supply chain security through Docker BuildKit's native attestation features:
+
+- **Automatic SBOM Generation**: Software Bill of Materials automatically generated and attached to images
+- **Build Provenance**: SLSA provenance attestations documenting the complete build process
+- **Docker Hub Integration**: Attestations automatically visible and indexed on Docker Hub
+- **Multi-Architecture Coverage**: Attestations generated for all 7-8 supported platforms
+- **No External Dependencies**: Built-in security without requiring additional tools
+
+#### Viewing Attestations
+```bash
+# View SBOM attestations
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .SBOM}}'
+
+# View build provenance attestations  
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .Provenance}}'
+
+# Test attestation verification locally
+./build-local.sh -t
+```
+
 
 ## Development
 
@@ -167,16 +188,19 @@ Typical compressed image sizes:
 ```
 .
 ├── Dockerfile                    # Multi-platform Alpine base image build
-├── download.sh                   # Alpine minirootfs download script  
+├── download.sh                   # Alpine minirootfs download script
+├── build-local.sh               # Local testing script with multi-arch support
+├── test-build.sh                # Quick interactive Docker image testing
 ├── CLAUDE.md                     # AI assistant project guidelines
 ├── README.md                     # Project documentation
 ├── rootfs/                       # Alpine minirootfs tarballs (3.14.3-3.22.1)
-├── .github/
-│   ├── workflows/               # CI/CD workflows
-│   │   ├── on-push-master_build-push.yaml      # Master branch builds
-│   │   └── on-push-non-master_build-push.yaml  # Feature branch builds  
-│   └── actions/
-│       └── docker/              # Custom Docker action with QEMU emulation
+├── scripts/                      # (Empty directory, reserved for future use)
+└── .github/
+    ├── workflows/               # CI/CD workflows with BuildKit attestations
+    │   ├── on-push-master_build-push.yaml      # Master branch builds
+    │   └── on-push-non-master_build-push.yaml  # Feature branch builds  
+    └── actions/
+        └── docker/              # Custom Docker action with QEMU emulation
 ```
 
 ### Contributing

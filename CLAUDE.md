@@ -65,7 +65,8 @@ docker buildx build --platform linux/amd64,linux/arm64/v8 --build-arg alpine_ver
 ./build-local.sh -a arm64                    # Build ARM64 only
 ./build-local.sh -v 3.21.4 -a amd64        # Specific Alpine version
 
-# Build all architectures
+# Build all architectures with attestation testing
+./build-local.sh -t                         # Test BuildKit attestations
 ./build-local.sh -A                         # Build all Alpine versions
 
 # Push to registry for testing
@@ -94,6 +95,7 @@ Both workflows publish to Docker Hub with full multi-architecture support.
 - `-a, --arch ARCH`: Build single architecture only (amd64, arm64, etc.)
 - `-A, --all-versions`: Build all supported Alpine versions
 - `-p, --push`: Push images to registry after building
+- `-t, --test-attestations`: Test BuildKit attestation verification after build
 - `-e, --test-emulation`: Test Docker Desktop architecture emulation capabilities
 - `-r, --registry PREFIX`: Registry prefix (default: liskl/base)
 
@@ -119,7 +121,31 @@ The resulting Docker image:
 - Sets environment variables for build tracking
 - Default entrypoint: `/bin/sh`
 - Includes build metadata in `/etc/build_release`
+- Enhanced with BuildKit native SBOM generation and build attestations
 - Minimal container optimized for size and security
+
+## Security Features
+
+### BuildKit Native Attestations (Implemented)
+The project leverages Docker BuildKit's built-in attestation capabilities:
+
+- **Automatic SBOM Generation**: Native BuildKit SBOM attestations for all images
+- **Build Provenance**: SLSA build attestations documenting the complete build process
+- **Docker Hub Integration**: Attestations automatically visible on Docker Hub
+- **Multi-Architecture Coverage**: Attestations generated for all supported platforms
+- **Supply Chain Security**: Built-in verification without external tools
+
+#### Viewing Attestations
+```bash
+# View BuildKit SBOM attestations
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .SBOM}}'
+
+# View BuildKit provenance attestations
+docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .Provenance}}'
+
+# Test attestation verification locally
+./build-local.sh -t
+```
 
 ## Required GitHub Configuration
 

@@ -294,12 +294,8 @@ jobs:
           DEV_MANIFEST_SHA=$(echo ${MANIFEST_DIGEST} | cut -d: -f2)
           DEV_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
-          # Create JSON using jq to ensure proper structure and validation
+          # Create SLSA predicate JSON (cosign expects ONLY the predicate, not the full attestation)
           jq -n \
-            --arg type "https://slsa.dev/provenance/v0.2" \
-            --arg predicateType "https://slsa.dev/provenance/v0.2" \
-            --arg name "liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}" \
-            --arg sha256 "${DEV_MANIFEST_SHA}" \
             --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-non-master_build-push.yaml@${{ github.ref }}" \
             --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
             --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
@@ -323,80 +319,70 @@ jobs:
             --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
             --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
             '{
-              "_type": $type,
-              "predicateType": $predicateType,
-              "subject": [{
-                "name": $name,
-                "digest": {
-                  "sha256": $sha256
-                }
-              }],
-              "predicate": {
-                "builder": {
-                  "id": $builderId
-                },
-                "buildType": $buildType,
-                "invocation": {
-                  "configSource": {
-                    "uri": $uri,
-                    "digest": {
-                      "sha1": $sha1
-                    },
-                    "entryPoint": $entryPoint
-                  },
-                  "parameters": {
-                    "alpine_version": $alpineVersion,
-                    "ALPINE_ARCH": "multi-platform",
-                    "RELEASE_VERSION": $alpineVersion,
-                    "BRANCH": $branch,
-                    "development_build": true
-                  },
-                  "environment": {
-                    "github": {
-                      "actor": $actor,
-                      "event_name": $eventName,
-                      "ref": $ref,
-                      "ref_type": $refType,
-                      "repository": $repository,
-                      "repository_owner": $repositoryOwner,
-                      "run_id": $runId,
-                      "run_number": $runNumber,
-                      "run_attempt": $runAttempt,
-                      "sha": $sha
-                    }
-                  }
-                },
-                "metadata": {
-                  "buildInvocationId": $buildInvocationId,
-                  "buildStartedOn": $buildStartedOn,
-                  "buildFinishedOn": $buildFinishedOn,
-                  "completeness": {
-                    "parameters": true,
-                    "environment": true,
-                    "materials": true
-                  },
-                  "reproducible": false
-                },
-                "materials": [{
+              "builder": {
+                "id": $builderId
+              },
+              "buildType": $buildType,
+              "invocation": {
+                "configSource": {
                   "uri": $uri,
                   "digest": {
                     "sha1": $sha1
+                  },
+                  "entryPoint": $entryPoint
+                },
+                "parameters": {
+                  "alpine_version": $alpineVersion,
+                  "ALPINE_ARCH": "multi-platform",
+                  "RELEASE_VERSION": $alpineVersion,
+                  "BRANCH": $branch,
+                  "development_build": true
+                },
+                "environment": {
+                  "github": {
+                    "actor": $actor,
+                    "event_name": $eventName,
+                    "ref": $ref,
+                    "ref_type": $refType,
+                    "repository": $repository,
+                    "repository_owner": $repositoryOwner,
+                    "run_id": $runId,
+                    "run_number": $runNumber,
+                    "run_attempt": $runAttempt,
+                    "sha": $sha
                   }
-                }, {
-                  "uri": $materialsUri,
-                  "digest": {
-                    "description": $materialsDesc
-                  }
-                }]
-              }
+                }
+              },
+              "metadata": {
+                "buildInvocationId": $buildInvocationId,
+                "buildStartedOn": $buildStartedOn,
+                "buildFinishedOn": $buildFinishedOn,
+                "completeness": {
+                  "parameters": true,
+                  "environment": true,
+                  "materials": true
+                },
+                "reproducible": false
+              },
+              "materials": [{
+                "uri": $uri,
+                "digest": {
+                  "sha1": $sha1
+                }
+              }, {
+                "uri": $materialsUri,
+                "digest": {
+                  "description": $materialsDesc
+                }
+              }]
             }' > /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
           
           # Validate the JSON was created correctly
-          echo "Generated SLSA provenance JSON:"
+          echo "Generated SLSA predicate JSON:"
           cat /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
           echo ""
           echo "Validating JSON structure..."
-          jq '.predicate.builder.id' /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          jq '.builder.id' /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
         
           # Attach SLSA provenance attestation
           cosign attest --yes \

@@ -399,12 +399,8 @@ jobs:
           MANIFEST_SHA=$(echo ${MANIFEST_DIGEST} | cut -d: -f2)
           BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
-          # Create JSON using jq to ensure proper structure and validation
+          # Create SLSA predicate JSON (cosign expects ONLY the predicate, not the full attestation)
           jq -n \
-            --arg type "https://slsa.dev/provenance/v0.2" \
-            --arg predicateType "https://slsa.dev/provenance/v0.2" \
-            --arg name "liskl/base:alpine-${{ matrix.alpine_version }}" \
-            --arg sha256 "${MANIFEST_SHA}" \
             --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}" \
             --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
             --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
@@ -428,15 +424,122 @@ jobs:
             --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
             --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
             '{
-              "_type": $type,
-              "predicateType": $predicateType,
-              "subject": [{
-                "name": $name,
-                "digest": {
-                  "sha256": $sha256
+              "builder": {
+                "id": $builderId
+              },
+              "buildType": $buildType,
+              "invocation": {
+                "configSource": {
+                  "uri": $uri,
+                  "digest": {
+                    "sha1": $sha1
+                  },
+                  "entryPoint": $entryPoint
+                },
+                "parameters": {
+                  "alpine_version": $alpineVersion,
+                  "ALPINE_ARCH": "multi-platform",
+                  "RELEASE_VERSION": $alpineVersion,
+                  "BRANCH": $branch
+                },
+                "environment": {
+                  "github": {
+                    "actor": $actor,
+                    "event_name": $eventName,
+                    "ref": $ref,
+                    "ref_type": $refType,
+                    "repository": $repository,
+                    "repository_owner": $repositoryOwner,
+                    "run_id": $runId,
+                    "run_number": $runNumber,
+                    "run_attempt": $runAttempt,
+                    "sha": $sha
+                  }
                 }
-              }],
-              "predicate": {
+              },
+              "metadata": {
+                "buildInvocationId": $buildInvocationId,
+                "buildStartedOn": $buildStartedOn,
+                "buildFinishedOn": $buildFinishedOn,
+                "completeness": {
+                  "parameters": true,
+                  "environment": true,
+                  "materials": true
+                },
+                "reproducible": false
+              },
+              "materials": [{
+                "uri": $uri,
+                "digest": {
+                  "sha1": $sha1
+                }
+              }, {
+                "uri": $materialsUri,
+                "digest": {
+                  "description": $materialsDesc
+                }
+              }]
+            }' > /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+          
+          # Validate the JSON was created correctly
+          echo "Generated SLSA predicate JSON:"
+          cat /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+          echo ""
+          echo "Validating JSON structure..."
+          jq '.builder.id' /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+        
+          # Attach SLSA provenance attestation
+          cosign attest --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            --predicate /tmp/slsa-provenance-${{ matrix.alpine_version }}.json \
+            --type slsaprovenance \
+            "${IMAGE_WITH_DIGEST}"
+          echo "✓ SLSA provenance attestation created"
+        fi
+        
+        # Generate SLSA provenance for latest tag (Alpine 3.22.1 only)
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          LATEST_IMAGE_WITH_DIGEST="liskl/base@${LATEST_DIGEST}"
+          echo "Checking for existing SLSA provenance on ${LATEST_IMAGE_WITH_DIGEST}"
+          
+          LATEST_SLSA_EXISTS=false
+          if cosign verify-attestation --key cosign.pub --type slsaprovenance "${LATEST_IMAGE_WITH_DIGEST}" >/dev/null 2>&1; then
+            echo "ℹ SLSA provenance attestation already exists for latest tag"
+            LATEST_SLSA_EXISTS=true
+          fi
+          
+          if [ "$LATEST_SLSA_EXISTS" = "false" ]; then
+            echo "Generating SLSA provenance for ${LATEST_IMAGE_WITH_DIGEST}"
+          
+            # Create SLSA provenance for latest tag using jq for reliable JSON generation
+            LATEST_SHA=$(echo ${LATEST_DIGEST} | cut -d: -f2)
+            LATEST_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            
+            # Create SLSA predicate JSON (cosign expects ONLY the predicate, not the full attestation)
+            jq -n \
+              --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}" \
+              --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
+              --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
+              --arg sha1 "${{ github.sha }}" \
+              --arg entryPoint ".github/workflows/on-push-master_build-push.yaml" \
+              --arg alpineVersion "${{ matrix.alpine_version }}" \
+              --arg branch "${{ github.ref_name }}" \
+              --arg actor "${{ github.actor }}" \
+              --arg eventName "${{ github.event_name }}" \
+              --arg ref "${{ github.ref }}" \
+              --arg refType "${{ github.ref_type }}" \
+              --arg repository "${{ github.repository }}" \
+              --arg repositoryOwner "${{ github.repository_owner }}" \
+              --arg runId "${{ github.run_id }}" \
+              --arg runNumber "${{ github.run_number }}" \
+              --arg runAttempt "${{ github.run_attempt }}" \
+              --arg sha "${{ github.sha }}" \
+              --arg buildInvocationId "${{ github.run_id }}-${{ github.run_attempt }}" \
+              --arg buildStartedOn "${{ github.event.head_commit.timestamp }}" \
+              --arg buildFinishedOn "${LATEST_BUILD_TIME}" \
+              --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
+              --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
+              '{
                 "builder": {
                   "id": $builderId
                 },
@@ -453,7 +556,8 @@ jobs:
                     "alpine_version": $alpineVersion,
                     "ALPINE_ARCH": "multi-platform",
                     "RELEASE_VERSION": $alpineVersion,
-                    "BRANCH": $branch
+                    "BRANCH": $branch,
+                    "tag": "latest"
                   },
                   "environment": {
                     "github": {
@@ -492,146 +596,14 @@ jobs:
                     "description": $materialsDesc
                   }
                 }]
-              }
-            }' > /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          
-          # Validate the JSON was created correctly
-          echo "Generated SLSA provenance JSON:"
-          cat /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo ""
-          echo "Validating JSON structure..."
-          jq '.predicate.builder.id' /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-        
-          # Attach SLSA provenance attestation
-          cosign attest --yes \
-            --key env://COSIGN_PRIVATE_KEY \
-            --predicate /tmp/slsa-provenance-${{ matrix.alpine_version }}.json \
-            --type slsaprovenance \
-            "${IMAGE_WITH_DIGEST}"
-          echo "✓ SLSA provenance attestation created"
-        fi
-        
-        # Generate SLSA provenance for latest tag (Alpine 3.22.1 only)
-        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          LATEST_IMAGE_WITH_DIGEST="liskl/base@${LATEST_DIGEST}"
-          echo "Checking for existing SLSA provenance on ${LATEST_IMAGE_WITH_DIGEST}"
-          
-          LATEST_SLSA_EXISTS=false
-          if cosign verify-attestation --key cosign.pub --type slsaprovenance "${LATEST_IMAGE_WITH_DIGEST}" >/dev/null 2>&1; then
-            echo "ℹ SLSA provenance attestation already exists for latest tag"
-            LATEST_SLSA_EXISTS=true
-          fi
-          
-          if [ "$LATEST_SLSA_EXISTS" = "false" ]; then
-            echo "Generating SLSA provenance for ${LATEST_IMAGE_WITH_DIGEST}"
-          
-            # Create SLSA provenance for latest tag using jq for reliable JSON generation
-            LATEST_SHA=$(echo ${LATEST_DIGEST} | cut -d: -f2)
-            LATEST_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            
-            # Create JSON using jq to ensure proper structure and validation
-            jq -n \
-              --arg type "https://slsa.dev/provenance/v0.2" \
-              --arg predicateType "https://slsa.dev/provenance/v0.2" \
-              --arg name "liskl/base:latest" \
-              --arg sha256 "${LATEST_SHA}" \
-              --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}" \
-              --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
-              --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
-              --arg sha1 "${{ github.sha }}" \
-              --arg entryPoint ".github/workflows/on-push-master_build-push.yaml" \
-              --arg alpineVersion "${{ matrix.alpine_version }}" \
-              --arg branch "${{ github.ref_name }}" \
-              --arg actor "${{ github.actor }}" \
-              --arg eventName "${{ github.event_name }}" \
-              --arg ref "${{ github.ref }}" \
-              --arg refType "${{ github.ref_type }}" \
-              --arg repository "${{ github.repository }}" \
-              --arg repositoryOwner "${{ github.repository_owner }}" \
-              --arg runId "${{ github.run_id }}" \
-              --arg runNumber "${{ github.run_number }}" \
-              --arg runAttempt "${{ github.run_attempt }}" \
-              --arg sha "${{ github.sha }}" \
-              --arg buildInvocationId "${{ github.run_id }}-${{ github.run_attempt }}" \
-              --arg buildStartedOn "${{ github.event.head_commit.timestamp }}" \
-              --arg buildFinishedOn "${LATEST_BUILD_TIME}" \
-              --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
-              --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
-              '{
-                "_type": $type,
-                "predicateType": $predicateType,
-                "subject": [{
-                  "name": $name,
-                  "digest": {
-                    "sha256": $sha256
-                  }
-                }],
-                "predicate": {
-                  "builder": {
-                    "id": $builderId
-                  },
-                  "buildType": $buildType,
-                  "invocation": {
-                    "configSource": {
-                      "uri": $uri,
-                      "digest": {
-                        "sha1": $sha1
-                      },
-                      "entryPoint": $entryPoint
-                    },
-                    "parameters": {
-                      "alpine_version": $alpineVersion,
-                      "ALPINE_ARCH": "multi-platform",
-                      "RELEASE_VERSION": $alpineVersion,
-                      "BRANCH": $branch,
-                      "tag": "latest"
-                    },
-                    "environment": {
-                      "github": {
-                        "actor": $actor,
-                        "event_name": $eventName,
-                        "ref": $ref,
-                        "ref_type": $refType,
-                        "repository": $repository,
-                        "repository_owner": $repositoryOwner,
-                        "run_id": $runId,
-                        "run_number": $runNumber,
-                        "run_attempt": $runAttempt,
-                        "sha": $sha
-                      }
-                    }
-                  },
-                  "metadata": {
-                    "buildInvocationId": $buildInvocationId,
-                    "buildStartedOn": $buildStartedOn,
-                    "buildFinishedOn": $buildFinishedOn,
-                    "completeness": {
-                      "parameters": true,
-                      "environment": true,
-                      "materials": true
-                    },
-                    "reproducible": false
-                  },
-                  "materials": [{
-                    "uri": $uri,
-                    "digest": {
-                      "sha1": $sha1
-                    }
-                  }, {
-                    "uri": $materialsUri,
-                    "digest": {
-                      "description": $materialsDesc
-                    }
-                  }]
-                }
               }' > /tmp/slsa-provenance-latest.json
             
             # Validate the JSON was created correctly
-            echo "Generated SLSA provenance JSON for latest:"
+            echo "Generated SLSA predicate JSON for latest:"
             cat /tmp/slsa-provenance-latest.json
             echo ""
             echo "Validating JSON structure..."
-            jq '.predicate.builder.id' /tmp/slsa-provenance-latest.json
+            jq '.builder.id' /tmp/slsa-provenance-latest.json
           
             # Attach SLSA provenance to latest tag
             cosign attest --yes \

@@ -37,6 +37,24 @@ docker buildx build --platform linux/amd64,linux/arm64/v8 --build-arg alpine_ver
 ./download.sh
 ```
 
+### Local Testing
+```bash
+# Quick interactive testing
+./test-build.sh
+
+# Build specific architecture for testing
+./build-local.sh -a amd64                    # Build AMD64 only
+./build-local.sh -a arm64                    # Build ARM64 only
+./build-local.sh -v 3.21.4 -a amd64        # Specific Alpine version
+
+# Build all architectures with attestation testing
+./build-local.sh -t                         # Test BuildKit attestations
+./build-local.sh -A                         # Build all Alpine versions
+
+# Push to registry for testing
+./build-local.sh -p -r myregistry/alpine    # Push to custom registry
+```
+
 ## CI/CD Workflows
 
 The project uses GitHub Actions with two workflows:

@@ -180,7 +180,10 @@ test_attestations() {
     
     # Test image functionality
     echo -e "${BLUE}Testing image functionality...${NC}"
-    if docker run --rm "$tag" echo "Image test successful" >/dev/null 2>&1; then
+    # Test basic container startup and file access
+    if docker run --rm "$tag" test -f /etc/build_release >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Image runs successfully and contains build metadata${NC}"
+    elif docker run --rm "$tag" >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Image runs successfully${NC}"
     else
         echo -e "${RED}✗ Image failed to run${NC}"

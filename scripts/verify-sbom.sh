@@ -24,20 +24,34 @@ command -v syft >/dev/null 2>&1 || { echo "Error: syft is required but not insta
 echo "✓ Required tools found (cosign, syft)"
 echo ""
 
+# Check for public key file or use keyless verification
+PUBLIC_KEY_FILE=""
+if [ -f "cosign.pub" ]; then
+    PUBLIC_KEY_FILE="--key cosign.pub"
+    echo "✓ Found cosign.pub, using key-based verification"
+elif [ -n "${COSIGN_PUBLIC_KEY:-}" ]; then
+    echo "${COSIGN_PUBLIC_KEY}" > /tmp/cosign.pub
+    PUBLIC_KEY_FILE="--key /tmp/cosign.pub"
+    echo "✓ Using COSIGN_PUBLIC_KEY environment variable"
+else
+    echo "ℹ Using keyless verification (no cosign.pub found)"
+fi
+echo ""
+
 # Verify SBOM attestations exist
 echo "1. Checking for SBOM attestations..."
 echo "   SPDX attestation:"
-if cosign verify-attestation --type spdx "$IMAGE" >/dev/null 2>&1; then
-    echo "   ✓ SPDX SBOM attestation found"
+if cosign verify-attestation ${PUBLIC_KEY_FILE} --type spdx "$IMAGE" >/dev/null 2>&1; then
+    echo "   ✓ SPDX SBOM attestation found and verified"
 else
-    echo "   ⚠ SPDX SBOM attestation not found (may be expected for local builds)"
+    echo "   ⚠ SPDX SBOM attestation not found or verification failed"
 fi
 
 echo "   CycloneDX attestation:"
-if cosign verify-attestation --type cyclonedx "$IMAGE" >/dev/null 2>&1; then
-    echo "   ✓ CycloneDX SBOM attestation found"
+if cosign verify-attestation ${PUBLIC_KEY_FILE} --type cyclonedx "$IMAGE" >/dev/null 2>&1; then
+    echo "   ✓ CycloneDX SBOM attestation found and verified"
 else
-    echo "   ⚠ CycloneDX SBOM attestation not found (may be expected for local builds)"
+    echo "   ⚠ CycloneDX SBOM attestation not found or verification failed"
 fi
 echo ""
 
@@ -47,7 +61,7 @@ mkdir -p /tmp/sbom-verification
 
 # Extract SPDX SBOM
 echo "   Extracting SPDX SBOM..."
-if cosign verify-attestation --type spdx "$IMAGE" --output-file /tmp/sbom-verification/spdx-attestation.json 2>/dev/null; then
+if cosign verify-attestation ${PUBLIC_KEY_FILE} --type spdx "$IMAGE" --output-file /tmp/sbom-verification/spdx-attestation.json 2>/dev/null; then
     echo "   ✓ SPDX SBOM extracted to /tmp/sbom-verification/spdx-attestation.json"
     
     # Parse and display summary
@@ -61,7 +75,7 @@ fi
 
 # Extract CycloneDX SBOM
 echo "   Extracting CycloneDX SBOM..."
-if cosign verify-attestation --type cyclonedx "$IMAGE" --output-file /tmp/sbom-verification/cyclonedx-attestation.json 2>/dev/null; then
+if cosign verify-attestation ${PUBLIC_KEY_FILE} --type cyclonedx "$IMAGE" --output-file /tmp/sbom-verification/cyclonedx-attestation.json 2>/dev/null; then
     echo "   ✓ CycloneDX SBOM extracted to /tmp/sbom-verification/cyclonedx-attestation.json"
     
     # Parse and display summary

@@ -193,6 +193,9 @@ jobs:
     
     # Generate SBOM and attach as attestation for development images
     - name: Generate and attach SBOM
+      env:
+        COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       run: |
         # Generate SBOM for the development multi-platform image using digest
         IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
@@ -207,14 +210,16 @@ jobs:
           --output cyclonedx-json \
           --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json
         
-        # Upload SBOM as attestation using cosign with digest (keyless signing)
+        # Upload SBOM as attestation using cosign with private key
         cosign attest --yes \
+          --key env://COSIGN_PRIVATE_KEY \
           --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json \
           --type spdx \
           "${IMAGE_WITH_DIGEST}"
         
         # Also attach CycloneDX SBOM
         cosign attest --yes \
+          --key env://COSIGN_PRIVATE_KEY \
           --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json \
           --type cyclonedx \
           "${IMAGE_WITH_DIGEST}"

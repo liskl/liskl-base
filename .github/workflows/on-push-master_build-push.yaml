@@ -240,6 +240,9 @@ jobs:
     
     # Generate SBOM and attach as attestation
     - name: Generate and attach SBOM
+      env:
+        COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       run: |
         # Generate SBOM for the multi-platform image using digest
         IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
@@ -254,14 +257,16 @@ jobs:
           --output cyclonedx-json \
           --file /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json
         
-        # Upload SBOM as attestation using cosign with digest (keyless signing)
+        # Upload SBOM as attestation using cosign with private key
         cosign attest --yes \
+          --key env://COSIGN_PRIVATE_KEY \
           --predicate /tmp/sbom-${{ matrix.alpine_version }}.spdx.json \
           --type spdx \
           "${IMAGE_WITH_DIGEST}"
         
         # Also attach CycloneDX SBOM
         cosign attest --yes \
+          --key env://COSIGN_PRIVATE_KEY \
           --predicate /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json \
           --type cyclonedx \
           "${IMAGE_WITH_DIGEST}"
@@ -282,11 +287,13 @@ jobs:
           
           # Attach SBOMs to latest tag using digest
           cosign attest --yes \
+            --key env://COSIGN_PRIVATE_KEY \
             --predicate /tmp/sbom-latest.spdx.json \
             --type spdx \
             "${LATEST_IMAGE_WITH_DIGEST}"
           
           cosign attest --yes \
+            --key env://COSIGN_PRIVATE_KEY \
             --predicate /tmp/sbom-latest.cyclonedx.json \
             --type cyclonedx \
             "${LATEST_IMAGE_WITH_DIGEST}"

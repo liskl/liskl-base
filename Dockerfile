@@ -16,6 +16,9 @@ ENV BRANCH=$BRANCH
 
 ADD ./rootfs/alpine-minirootfs-${alpine_version}-${ALPINE_ARCH}.tar.gz /
 
-RUN printf "BASE_BRANCH=%s\nBASE_SHA=%s\nALPINE_VERSION=%s\nARCH=%s\n" "${BRANCH}" "${COMMIT_SHA}" "${alpine_version}" "${ALPINE_ARCH}" > /etc/build_release
+RUN echo "BASE_BRANCH=${BRANCH}" > /etc/build_release && \
+    echo "BASE_SHA=${COMMIT_SHA}" >> /etc/build_release && \
+    echo "ALPINE_VERSION=${alpine_version}" >> /etc/build_release && \
+    echo "ARCH=${ALPINE_ARCH}" >> /etc/build_release
 
 ENTRYPOINT ["/bin/sh"]

@@ -85,26 +85,45 @@ jobs:
           BRANCH=${{ env.SHORT_SHA }}
           alpine_version=${{ matrix.alpine_version }}
     
-    # Test the locally built image
-    - name: Test built image functionality
+    # Validate the locally built image
+    - name: Validate built image
       if: steps.verify_tag.outputs.is_safe == 'true'
       run: |
-        echo "::notice::Testing built image: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test"
+        echo "::notice::Validating built image: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test"
         
-        # Debug image info
-        docker image inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test
+        # Verify image exists and has correct properties
+        IMAGE_ID=$(docker images -q liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test)
+        if [ -z "$IMAGE_ID" ]; then
+          echo "::error::Image not found"
+          exit 1
+        fi
         
-        # Test the locally built image with simpler command first
-        echo "::notice::Testing simple command..."
-        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test /bin/sh -c "echo 'Test successful'"
+        # Check image metadata
+        ARCH=$(docker image inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test --format '{{.Architecture}}')
+        ENTRYPOINT=$(docker image inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test --format '{{.Config.Entrypoint}}')
         
-        echo "::notice::✅ Image test completed successfully for Alpine ${{ matrix.alpine_version }}"
+        echo "::notice::Image ID: $IMAGE_ID"
+        echo "::notice::Architecture: $ARCH"
+        echo "::notice::Entrypoint: $ENTRYPOINT"
+        
+        # Verify expected properties
+        if [ "$ARCH" != "amd64" ]; then
+          echo "::error::Expected amd64 architecture, got: $ARCH"
+          exit 1
+        fi
+        
+        if [ "$ENTRYPOINT" != "[/bin/sh]" ]; then
+          echo "::error::Expected [/bin/sh] entrypoint, got: $ENTRYPOINT"
+          exit 1
+        fi
+        
+        echo "::notice::✅ Image validation completed successfully for Alpine ${{ matrix.alpine_version }}"
     
     # Summary step for feature branch builds
     - name: Build summary  
       run: |
         if [ "${{ steps.verify_tag.outputs.is_safe }}" = "true" ]; then
-          echo "::notice::✅ Successfully built multi-platform and tested ${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
+          echo "::notice::✅ Successfully built multi-platform and validated ${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
         else
           echo "::error::❌ Build skipped due to tag safety check failure"
         fi

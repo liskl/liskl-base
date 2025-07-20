@@ -290,77 +290,78 @@ jobs:
         if [ "$SLSA_EXISTS" = "false" ]; then
           echo "Generating SLSA provenance for ${IMAGE_WITH_DIGEST}"
         
-          # Create SLSA provenance predicate for development build
-          cat > /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json << 'EOF'
-          {
-            "_type": "https://slsa.dev/provenance/v0.2",
-            "predicateType": "https://slsa.dev/provenance/v0.2",
-            "subject": [{
-              "name": "liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}",
-              "digest": {
-                "sha256": "$(echo ${MANIFEST_DIGEST} | cut -d: -f2)"
-              }
-            }],
-            "predicate": {
-              "builder": {
-                "id": "https://github.com/liskl/liskl-base/.github/workflows/on-push-non-master_build-push.yaml@${{ github.ref }}"
-              },
-              "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",
-              "invocation": {
-                "configSource": {
-                  "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
-                  "digest": {
-                    "sha1": "${{ github.sha }}"
-                  },
-                  "entryPoint": ".github/workflows/on-push-non-master_build-push.yaml"
-                },
-                "parameters": {
-                  "alpine_version": "${{ matrix.alpine_version }}",
-                  "ALPINE_ARCH": "multi-platform",
-                  "RELEASE_VERSION": "${{ matrix.alpine_version }}",
-                  "BRANCH": "${{ env.SHORT_SHA }}",
-                  "development_build": true
-                },
-                "environment": {
-                  "github": {
-                    "actor": "${{ github.actor }}",
-                    "event_name": "${{ github.event_name }}",
-                    "ref": "${{ github.ref }}",
-                    "ref_type": "${{ github.ref_type }}",
-                    "repository": "${{ github.repository }}",
-                    "repository_owner": "${{ github.repository_owner }}",
-                    "run_id": "${{ github.run_id }}",
-                    "run_number": "${{ github.run_number }}",
-                    "run_attempt": "${{ github.run_attempt }}",
-                    "sha": "${{ github.sha }}"
-                  }
-                }
-              },
-              "metadata": {
-                "buildInvocationId": "${{ github.run_id }}-${{ github.run_attempt }}",
-                "buildStartedOn": "${{ github.event.head_commit.timestamp }}",
-                "buildFinishedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-                "completeness": {
-                  "parameters": true,
-                  "environment": true,
-                  "materials": true
-                },
-                "reproducible": false
-              },
-              "materials": [{
-                "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
-                "digest": {
-                  "sha1": "${{ github.sha }}"
-                }
-              }, {
-                "uri": "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/",
-                "digest": {
-                  "description": "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}"
-                }
-              }]
-            }
-          }
-EOF
+          # Create SLSA provenance predicate for development build using echo to avoid heredoc issues
+          DEV_MANIFEST_SHA=$(echo ${MANIFEST_DIGEST} | cut -d: -f2)
+          DEV_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          echo '{' > /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  "_type": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  "predicateType": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  "subject": [{' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "    \"name\": \"liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "digest": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"sha256\": \"${DEV_MANIFEST_SHA}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  }],' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  "predicate": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "builder": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"id\": \"https://github.com/liskl/liskl-base/.github/workflows/on-push-non-master_build-push.yaml@${{ github.ref }}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "invocation": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "configSource": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "digest": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "entryPoint": ".github/workflows/on-push-non-master_build-push.yaml"' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "parameters": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"alpine_version\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "ALPINE_ARCH": "multi-platform",' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"RELEASE_VERSION\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"BRANCH\": \"${{ env.SHORT_SHA }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "development_build": true' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "environment": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "github": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"actor\": \"${{ github.actor }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"event_name\": \"${{ github.event_name }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"ref\": \"${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"ref_type\": \"${{ github.ref_type }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"repository\": \"${{ github.repository }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"repository_owner\": \"${{ github.repository_owner }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"run_id\": \"${{ github.run_id }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"run_number\": \"${{ github.run_number }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"run_attempt\": \"${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "          \"sha\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "metadata": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"buildInvocationId\": \"${{ github.run_id }}-${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"buildStartedOn\": \"${{ github.event.head_commit.timestamp }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"buildFinishedOn\": \"${DEV_BUILD_TIME}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "completeness": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "parameters": true,' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "environment": true,' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '        "materials": true' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "reproducible": false' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    },' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    "materials": [{' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "digest": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    }, {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "      \"uri\": \"https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/\"," >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      "digest": {' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo "        \"description\": \"Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}\"" >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '      }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '    }]' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '  }' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
+          echo '}' >> /tmp/slsa-provenance-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.json
         
           # Attach SLSA provenance attestation
           cosign attest --yes \

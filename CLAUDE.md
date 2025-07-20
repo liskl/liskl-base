@@ -21,6 +21,10 @@ This is a Docker base image project that creates minimal Alpine Linux containers
 - `build-local.sh`: Local testing script with multi-arch and emulation testing
 - `test-build.sh`: Quick interactive Docker image testing script
 
+### Scripts
+- `scripts/check-immutable-tags.sh`: Immutable Docker tag detection script (prevents pushing to protected tags)
+- `scripts/test-check-immutable-tags.sh`: Unit tests for immutable tag detection
+
 ### CI/CD Workflows
 - `.github/workflows/on-push-master_build-push.yaml`: Master branch workflow (builds all Alpine versions)
 - `.github/workflows/on-push-non-master_build-push.yaml`: Feature branch workflow (builds with commit SHA tags)
@@ -145,6 +149,31 @@ docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .Prov
 
 # Test attestation verification locally
 ./build-local.sh -t
+```
+
+### Immutable Tag Protection
+The project includes protection for immutable Docker Hub tags to prevent accidental overwrites:
+
+- **Protected Pattern**: `^alpine-[0-9]+\.[0-9]+\.[0-9]+$` (e.g., `alpine-3.22.1`, `alpine-3.21.4`)
+- **Detection Script**: `scripts/check-immutable-tags.sh` validates tags before push operations
+- **CI/CD Integration**: Workflows use the detection script to skip protected tags gracefully
+
+#### Using Immutable Tag Detection
+```bash
+# Check if tags are immutable and exist on Docker Hub
+./scripts/check-immutable-tags.sh alpine-3.22.1 alpine-3.21.4
+
+# JSON output for programmatic use
+./scripts/check-immutable-tags.sh --json alpine-3.22.1
+
+# Debug mode for troubleshooting
+./scripts/check-immutable-tags.sh --debug alpine-3.22.1
+
+# Custom registry
+./scripts/check-immutable-tags.sh --registry myregistry/base alpine-3.22.1
+
+# Run unit tests
+./scripts/test-check-immutable-tags.sh
 ```
 
 ## Required GitHub Configuration

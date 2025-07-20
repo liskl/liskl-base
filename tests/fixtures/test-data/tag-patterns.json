@@ -1,0 +1,146 @@
+{
+  "immutable_tags": [
+    {
+      "tag": "alpine-3.22.1",
+      "description": "Current latest Alpine version",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-3.21.4",
+      "description": "Previous Alpine version",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-3.20.7",
+      "description": "Older Alpine version",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-0.0.1",
+      "description": "Minimal version numbers",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-99.99.99",
+      "description": "Maximum reasonable version numbers",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-1.0.0",
+      "description": "Single digit major version",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-10.20.30",
+      "description": "Double digit version numbers",
+      "should_match": true
+    },
+    {
+      "tag": "alpine-100.200.300",
+      "description": "Triple digit version numbers",
+      "should_match": true
+    }
+  ],
+  "mutable_tags": [
+    {
+      "tag": "latest",
+      "description": "Docker latest tag",
+      "should_match": false
+    },
+    {
+      "tag": "522a89e-alpine-3.22.1",
+      "description": "Feature branch commit prefix",
+      "should_match": false
+    },
+    {
+      "tag": "3e82e63-alpine-3.21.4",
+      "description": "Another commit-prefixed tag",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1-dev",
+      "description": "Development suffix",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1-rc1",
+      "description": "Release candidate suffix",
+      "should_match": false
+    },
+    {
+      "tag": "dev-alpine-3.22.1",
+      "description": "Development prefix",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22",
+      "description": "Missing patch version",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3",
+      "description": "Missing minor and patch versions",
+      "should_match": false
+    },
+    {
+      "tag": "alpine",
+      "description": "No version information",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1.1",
+      "description": "Too many version components",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-v3.22.1",
+      "description": "Version prefix",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1a",
+      "description": "Non-numeric patch version",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.a",
+      "description": "Non-numeric minor version",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-a.22.1",
+      "description": "Non-numeric major version",
+      "should_match": false
+    },
+    {
+      "tag": "",
+      "description": "Empty string",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-",
+      "description": "Missing version after dash",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1-",
+      "description": "Trailing dash",
+      "should_match": false
+    },
+    {
+      "tag": "-alpine-3.22.1",
+      "description": "Leading dash",
+      "should_match": false
+    },
+    {
+      "tag": "test-alpine-3.22.1",
+      "description": "Test prefix",
+      "should_match": false
+    },
+    {
+      "tag": "alpine-3.22.1-test",
+      "description": "Test suffix",
+      "should_match": false
+    }
+  ]
+}

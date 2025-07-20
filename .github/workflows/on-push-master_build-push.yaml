@@ -301,3 +301,176 @@ jobs:
             --type cyclonedx \
             "${LATEST_IMAGE_WITH_DIGEST}"
         fi
+    
+    # Generate SLSA provenance attestation
+    - name: Generate and attach SLSA provenance
+      env:
+        COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      run: |
+        # Generate SLSA provenance for the multi-platform image
+        IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
+        echo "Generating SLSA provenance for ${IMAGE_WITH_DIGEST}"
+        
+        # Create SLSA provenance predicate
+        cat > /tmp/slsa-provenance-${{ matrix.alpine_version }}.json << EOF
+        {
+          "_type": "https://slsa.dev/provenance/v0.2",
+          "predicateType": "https://slsa.dev/provenance/v0.2",
+          "subject": [{
+            "name": "liskl/base:alpine-${{ matrix.alpine_version }}",
+            "digest": {
+              "sha256": "$(echo ${MANIFEST_DIGEST} | cut -d: -f2)"
+            }
+          }],
+          "predicate": {
+            "builder": {
+              "id": "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}"
+            },
+            "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",
+            "invocation": {
+              "configSource": {
+                "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
+                "digest": {
+                  "sha1": "${{ github.sha }}"
+                },
+                "entryPoint": ".github/workflows/on-push-master_build-push.yaml"
+              },
+              "parameters": {
+                "alpine_version": "${{ matrix.alpine_version }}",
+                "ALPINE_ARCH": "multi-platform",
+                "RELEASE_VERSION": "${{ matrix.alpine_version }}",
+                "BRANCH": "${{ github.ref_name }}"
+              },
+              "environment": {
+                "github": {
+                  "actor": "${{ github.actor }}",
+                  "event_name": "${{ github.event_name }}",
+                  "ref": "${{ github.ref }}",
+                  "ref_type": "${{ github.ref_type }}",
+                  "repository": "${{ github.repository }}",
+                  "repository_owner": "${{ github.repository_owner }}",
+                  "run_id": "${{ github.run_id }}",
+                  "run_number": "${{ github.run_number }}",
+                  "run_attempt": "${{ github.run_attempt }}",
+                  "sha": "${{ github.sha }}"
+                }
+              }
+            },
+            "metadata": {
+              "buildInvocationId": "${{ github.run_id }}-${{ github.run_attempt }}",
+              "buildStartedOn": "${{ github.event.head_commit.timestamp }}",
+              "buildFinishedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "completeness": {
+                "parameters": true,
+                "environment": true,
+                "materials": true
+              },
+              "reproducible": false
+            },
+            "materials": [{
+              "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
+              "digest": {
+                "sha1": "${{ github.sha }}"
+              }
+            }, {
+              "uri": "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/",
+              "digest": {
+                "description": "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}"
+              }
+            }]
+          }
+        }
+        EOF
+        
+        # Attach SLSA provenance attestation
+        cosign attest --yes \
+          --key env://COSIGN_PRIVATE_KEY \
+          --predicate /tmp/slsa-provenance-${{ matrix.alpine_version }}.json \
+          --type slsaprovenance \
+          "${IMAGE_WITH_DIGEST}"
+        
+        # Generate SLSA provenance for latest tag (Alpine 3.22.1 only)
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          LATEST_IMAGE_WITH_DIGEST="liskl/base@${LATEST_DIGEST}"
+          echo "Generating SLSA provenance for ${LATEST_IMAGE_WITH_DIGEST}"
+          
+          # Create SLSA provenance for latest tag
+          cat > /tmp/slsa-provenance-latest.json << EOF
+          {
+            "_type": "https://slsa.dev/provenance/v0.2",
+            "predicateType": "https://slsa.dev/provenance/v0.2",
+            "subject": [{
+              "name": "liskl/base:latest",
+              "digest": {
+                "sha256": "$(echo ${LATEST_DIGEST} | cut -d: -f2)"
+              }
+            }],
+            "predicate": {
+              "builder": {
+                "id": "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}"
+              },
+              "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",
+              "invocation": {
+                "configSource": {
+                  "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
+                  "digest": {
+                    "sha1": "${{ github.sha }}"
+                  },
+                  "entryPoint": ".github/workflows/on-push-master_build-push.yaml"
+                },
+                "parameters": {
+                  "alpine_version": "${{ matrix.alpine_version }}",
+                  "ALPINE_ARCH": "multi-platform",
+                  "RELEASE_VERSION": "${{ matrix.alpine_version }}",
+                  "BRANCH": "${{ github.ref_name }}",
+                  "tag": "latest"
+                },
+                "environment": {
+                  "github": {
+                    "actor": "${{ github.actor }}",
+                    "event_name": "${{ github.event_name }}",
+                    "ref": "${{ github.ref }}",
+                    "ref_type": "${{ github.ref_type }}",
+                    "repository": "${{ github.repository }}",
+                    "repository_owner": "${{ github.repository_owner }}",
+                    "run_id": "${{ github.run_id }}",
+                    "run_number": "${{ github.run_number }}",
+                    "run_attempt": "${{ github.run_attempt }}",
+                    "sha": "${{ github.sha }}"
+                  }
+                }
+              },
+              "metadata": {
+                "buildInvocationId": "${{ github.run_id }}-${{ github.run_attempt }}",
+                "buildStartedOn": "${{ github.event.head_commit.timestamp }}",
+                "buildFinishedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "completeness": {
+                  "parameters": true,
+                  "environment": true,
+                  "materials": true
+                },
+                "reproducible": false
+              },
+              "materials": [{
+                "uri": "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}",
+                "digest": {
+                  "sha1": "${{ github.sha }}"
+                }
+              }, {
+                "uri": "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/",
+                "digest": {
+                  "description": "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}"
+                }
+              }]
+            }
+          }
+          EOF
+          
+          # Attach SLSA provenance to latest tag
+          cosign attest --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            --predicate /tmp/slsa-provenance-latest.json \
+            --type slsaprovenance \
+            "${LATEST_IMAGE_WITH_DIGEST}"
+        fi

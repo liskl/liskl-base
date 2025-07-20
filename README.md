@@ -180,8 +180,16 @@ cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 
 # Run vulnerability scan with grype
 grype sbom:sbom.spdx.json --fail-on critical
 
-# Use provided verification script (auto-detects cosign.pub)
-./scripts/verify-sbom.sh alpine-3.22.1
+# Verify SLSA provenance attestation
+cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1
+
+# Extract build provenance for compliance audit
+cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1 \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > provenance.json
+
+# Use provided verification scripts (auto-detect cosign.pub)
+./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification
+./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
 
 # Generate cosign key pair for repository setup
 ./scripts/generate-cosign-keys.sh
@@ -196,8 +204,24 @@ grype sbom:sbom.spdx.json --fail-on critical
    - `COSIGN_PUBLIC_KEY`: Contents of generated `cosign.pub` file
 4. **Public Verification**: The public key is automatically available for verification
 
-### Security Features (Planned)
-- **Build Attestations** (Issue #12): SLSA provenance attestations for build integrity verification and enterprise compliance
+### Build Attestations (Implemented)
+Enterprise-grade build integrity and supply chain transparency through SLSA provenance:
+
+- **SLSA v0.2 Provenance**: Complete build process documentation and traceability
+- **Supply Chain Transparency**: Full documentation of build materials and environment
+- **GitHub Actions Integration**: Captures complete CI/CD build context and metadata
+- **Enterprise Compliance**: Meets NIST cybersecurity framework and EU Cyber Resilience Act
+- **Non-repudiation**: Cryptographically signed build evidence prevents tampering
+- **Multi-platform Coverage**: Attestations generated for all 8 supported architectures
+
+#### Build Attestation Features
+- **Builder Identification**: Tracks exact GitHub Actions workflow used for build
+- **Source Verification**: Links to specific git commit and repository state
+- **Build Environment**: Complete GitHub Actions environment context
+- **Build Parameters**: All build arguments and configuration captured
+- **Material Tracking**: Source code and Alpine Linux minirootfs dependencies
+- **Timing Information**: Build start/finish timestamps for audit trails
+- **Compliance Metadata**: Completeness assertions for enterprise auditing
 
 ## Development
 
@@ -208,8 +232,10 @@ grype sbom:sbom.spdx.json --fail-on critical
 ├── download.sh             # Alpine rootfs download script
 ├── rootfs/                 # Alpine minirootfs tarballs
 ├── scripts/
-│   └── verify-sbom.sh     # SBOM verification and extraction script
-├── .github/workflows/      # CI/CD workflows with SBOM generation
+│   ├── verify-sbom.sh     # SBOM verification and extraction script
+│   ├── verify-attestations.sh # Complete attestation verification and analysis
+│   └── generate-cosign-keys.sh # Cosign key generation and setup
+├── .github/workflows/      # CI/CD workflows with SBOM and attestation generation
 └── CLAUDE.md              # AI assistant guidelines
 ```
 

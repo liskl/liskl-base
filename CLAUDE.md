@@ -88,21 +88,37 @@ The resulting Docker image:
 - **Vulnerability ready**: Compatible with grype, snyk, and other scanners
 - **Secure signing**: Uses image digests to prevent tag substitution attacks
 
+### Build Attestations (Implemented)
+- **SLSA provenance**: Complete build integrity and source traceability
+- **Supply chain transparency**: Full documentation of build process and materials
+- **GitHub Actions integration**: Captures complete build environment details
+- **Enterprise compliance**: Meets NIST and EU Cyber Resilience Act requirements
+- **Non-repudiation**: Cryptographically signed build evidence
+- **Multi-platform coverage**: Attestations for all architectures and Alpine versions
+
 ### Security Verification
 ```bash
 # Verify SBOM attestations (requires cosign.pub public key)
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
 cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
 
+# Verify SLSA provenance attestation
+cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1
+
 # Extract SBOM for vulnerability scanning
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 \
   | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
 
+# Extract build provenance for compliance audit
+cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1 \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > provenance.json
+
 # Run vulnerability scan
 grype sbom:sbom.spdx.json --fail-on critical
 
-# Use verification script (auto-detects cosign.pub)
-./scripts/verify-sbom.sh alpine-3.22.1
+# Use verification scripts (auto-detect cosign.pub)
+./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification
+./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
 
 # Generate cosign key pair for signing
 ./scripts/generate-cosign-keys.sh

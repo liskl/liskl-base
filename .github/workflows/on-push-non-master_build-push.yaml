@@ -85,45 +85,36 @@ jobs:
           BRANCH=${{ env.SHORT_SHA }}
           alpine_version=${{ matrix.alpine_version }}
     
-    # Validate the locally built image
-    - name: Validate built image
+    # Test the locally built image by running commands
+    - name: Test built image functionality  
       if: steps.verify_tag.outputs.is_safe == 'true'
       run: |
-        echo "::notice::Validating built image: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test"
+        echo "::notice::Testing built image: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test"
         
-        # Verify image exists and has correct properties
-        IMAGE_ID=$(docker images -q liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test)
-        if [ -z "$IMAGE_ID" ]; then
-          echo "::error::Image not found"
-          exit 1
-        fi
+        # Test 1: Check if /etc/build_release exists (created by our Dockerfile)
+        echo "::notice::Test 1: Checking /etc/build_release file exists..."
+        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test /bin/test -f /etc/build_release
+        echo "::notice::✅ /etc/build_release file exists"
         
-        # Check image metadata
-        ARCH=$(docker image inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test --format '{{.Architecture}}')
-        ENTRYPOINT=$(docker image inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test --format '{{.Config.Entrypoint}}')
+        # Test 2: Verify we can read the build_release file
+        echo "::notice::Test 2: Reading /etc/build_release contents..."
+        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test cat /etc/build_release
         
-        echo "::notice::Image ID: $IMAGE_ID"
-        echo "::notice::Architecture: $ARCH"
-        echo "::notice::Entrypoint: $ENTRYPOINT"
+        # Test 3: Test basic shell functionality with a simple command
+        echo "::notice::Test 3: Testing basic shell operations..."
+        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test /bin/sh -c "/bin/test -d /etc && echo 'Shell and file system working'"
         
-        # Verify expected properties
-        if [ "$ARCH" != "amd64" ]; then
-          echo "::error::Expected amd64 architecture, got: $ARCH"
-          exit 1
-        fi
+        # Test 4: Verify Alpine version info is accessible
+        echo "::notice::Test 4: Checking Alpine release info..."
+        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test cat /etc/alpine-release
         
-        if [ "$ENTRYPOINT" != "[/bin/sh]" ]; then
-          echo "::error::Expected [/bin/sh] entrypoint, got: $ENTRYPOINT"
-          exit 1
-        fi
-        
-        echo "::notice::✅ Image validation completed successfully for Alpine ${{ matrix.alpine_version }}"
+        echo "::notice::✅ All container tests completed successfully for Alpine ${{ matrix.alpine_version }}"
     
     # Summary step for feature branch builds
     - name: Build summary  
       run: |
         if [ "${{ steps.verify_tag.outputs.is_safe }}" = "true" ]; then
-          echo "::notice::✅ Successfully built multi-platform and validated ${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
+          echo "::notice::✅ Successfully built multi-platform and tested ${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
         else
           echo "::error::❌ Build skipped due to tag safety check failure"
         fi

@@ -28,9 +28,70 @@ jobs:
       id: extract_branch
       run: echo "BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_ENV
     
+    # Check if tags are immutable and already exist on Docker Hub
+    - name: Check immutable tag status
+      id: check_tags
+      run: |
+        echo "Checking immutable tag status for alpine-${{ matrix.alpine_version }}"
+        
+        # Prepare tags to check
+        TAGS_TO_CHECK="alpine-${{ matrix.alpine_version }}"
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          TAGS_TO_CHECK="$TAGS_TO_CHECK latest"
+        fi
+        
+        # Check each tag
+        SHOULD_SKIP_ALPINE="false"
+        SHOULD_SKIP_LATEST="false"
+        
+        for tag in $TAGS_TO_CHECK; do
+          echo "::group::Checking tag: $tag"
+          if ./scripts/check-immutable-tags.sh --quiet "$tag"; then
+            echo "✅ Tag $tag: Can push (safe)"
+            if [ "$tag" = "latest" ]; then
+              echo "should_push_latest=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_push_alpine=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            exit_code=$?
+            if [ $exit_code -eq 1 ]; then
+              echo "⚠️ Tag $tag: Skipping (immutable and exists)"
+              if [ "$tag" = "latest" ]; then
+                SHOULD_SKIP_LATEST="true"
+                echo "should_push_latest=false" >> $GITHUB_OUTPUT
+              else
+                SHOULD_SKIP_ALPINE="true" 
+                echo "should_push_alpine=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "❌ Tag $tag: API error (exit code: $exit_code)"
+              echo "::error::Failed to check tag $tag (API error)"
+              exit 1
+            fi
+          fi
+          echo "::endgroup::"
+        done
+        
+        # Set overall push decision
+        if [ "$SHOULD_SKIP_ALPINE" = "true" ] && [ "$SHOULD_SKIP_LATEST" = "true" ]; then
+          echo "should_push=false" >> $GITHUB_OUTPUT
+          echo "::notice::Skipping all pushes - both alpine-${{ matrix.alpine_version }} and latest exist"
+        elif [ "$SHOULD_SKIP_ALPINE" = "true" ]; then
+          echo "should_push=false" >> $GITHUB_OUTPUT  
+          echo "::notice::Skipping push - alpine-${{ matrix.alpine_version }} exists and is immutable"
+        else
+          echo "should_push=true" >> $GITHUB_OUTPUT
+          if [ "$SHOULD_SKIP_LATEST" = "true" ]; then
+            echo "::notice::Will push alpine-${{ matrix.alpine_version }} but skip latest (exists)"
+          else
+            echo "::notice::Will push all tags (safe to proceed)"
+          fi
+        fi
     
     # Build and push multi-platform manifest with attestations using buildx
     - name: Build and push multi-platform manifest with attestations
+      if: steps.check_tags.outputs.should_push == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -40,9 +101,23 @@ jobs:
         sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}
-          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest' || '' }}
+          ${{ matrix.alpine_version == '3.22.1' && steps.check_tags.outputs.should_push_latest == 'true' && 'liskl/base:latest' || '' }}
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.BRANCH }}
           alpine_version=${{ matrix.alpine_version }}
+    
+    # Summary step to show what was done
+    - name: Build summary
+      run: |
+        if [ "${{ steps.check_tags.outputs.should_push }}" = "true" ]; then
+          echo "::notice::✅ Successfully built and pushed alpine-${{ matrix.alpine_version }}"
+          if [ "${{ matrix.alpine_version }}" = "3.22.1" ] && [ "${{ steps.check_tags.outputs.should_push_latest }}" = "true" ]; then
+            echo "::notice::✅ Successfully built and pushed latest tag"
+          elif [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+            echo "::notice::ℹ️ Skipped latest tag (already exists)"
+          fi
+        else
+          echo "::notice::⏭️ Skipped build for alpine-${{ matrix.alpine_version }} (tag already exists)"
+        fi
     

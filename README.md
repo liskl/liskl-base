@@ -112,15 +112,6 @@ docker buildx build \
   --push .
 ```
 
-### Local Testing
-```bash
-# Test SBOM generation and verification locally
-./test-sbom-local.sh
-
-# Test attestation generation and verification locally  
-./test-attestations-local.sh
-```
-
 ## CI/CD
 
 This repository uses GitHub Actions for automated building and publishing:
@@ -169,73 +160,6 @@ Typical compressed image sizes:
 - Regular updates following Alpine Linux security advisories
 - Multi-architecture support for diverse deployment environments
 
-### SBOM Generation (Implemented)
-All images include comprehensive Software Bill of Materials (SBOM) for supply chain security:
-
-- **SPDX Format**: Industry-standard SBOM format for compliance frameworks
-- **CycloneDX Format**: Enhanced tool compatibility and ecosystem integration
-- **Automated Generation**: Generated during every CI/CD build process
-- **Cryptographic Attestation**: Signed and attached using cosign keyless signing
-- **Multi-Architecture Coverage**: SBOMs generated for all supported platforms
-- **Vulnerability Scanning Ready**: Compatible with grype, snyk, and other security tools
-
-#### SBOM Verification Examples  
-```bash
-# Use provided verification scripts (recommended - auto-detects cosign.pub)
-./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification and extraction
-./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
-
-# Generate cosign key pair for repository setup
-./scripts/generate-cosign-keys.sh
-
-# Manual verification (requires cosign.pub public key)
-cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
-cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
-
-# Extract SBOM for vulnerability scanning
-cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 \
-  | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
-
-# Run vulnerability scan with grype
-grype sbom:sbom.spdx.json --fail-on critical
-
-# Verify SLSA provenance attestation  
-cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1
-
-# Extract build provenance for compliance audit
-cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1 \
-  | jq -r '.payload | @base64d | fromjson | .predicate' > provenance.json
-```
-
-#### Required Setup for Repository Maintainers
-1. **Generate Key Pair**: Run `./scripts/generate-cosign-keys.sh` to create signing keys
-2. **Configure GitHub Secrets** (Settings > Secrets and variables > Actions > Secrets):
-   - `DOCKERHUB_USERNAME`: Docker Hub username for publishing images
-   - `DOCKERHUB_TOKEN`: Docker Hub access token for authentication  
-   - `COSIGN_PRIVATE_KEY`: Contents of generated `cosign.key` file
-   - `COSIGN_PASSWORD`: Password used during key generation
-3. **Configure GitHub Variables** (Settings > Secrets and variables > Actions > Variables):
-   - `COSIGN_PUBLIC_KEY`: Contents of generated `cosign.pub` file
-4. **Public Verification**: The public key is automatically available for verification
-
-### Build Attestations (Implemented)
-Enterprise-grade build integrity and supply chain transparency through SLSA provenance:
-
-- **SLSA v0.2 Provenance**: Complete build process documentation and traceability
-- **Supply Chain Transparency**: Full documentation of build materials and environment
-- **GitHub Actions Integration**: Captures complete CI/CD build context and metadata
-- **Enterprise Compliance**: Meets NIST cybersecurity framework and EU Cyber Resilience Act
-- **Non-repudiation**: Cryptographically signed build evidence prevents tampering
-- **Multi-platform Coverage**: Attestations generated for all 8 supported architectures
-
-#### Build Attestation Features
-- **Builder Identification**: Tracks exact GitHub Actions workflow used for build
-- **Source Verification**: Links to specific git commit and repository state
-- **Build Environment**: Complete GitHub Actions environment context
-- **Build Parameters**: All build arguments and configuration captured
-- **Material Tracking**: Source code and Alpine Linux minirootfs dependencies
-- **Timing Information**: Build start/finish timestamps for audit trails
-- **Compliance Metadata**: Completeness assertions for enterprise auditing
 
 ## Development
 
@@ -247,14 +171,8 @@ Enterprise-grade build integrity and supply chain transparency through SLSA prov
 ├── CLAUDE.md                     # AI assistant project guidelines
 ├── README.md                     # Project documentation
 ├── rootfs/                       # Alpine minirootfs tarballs (3.14.3-3.22.1)
-├── scripts/
-│   ├── generate-cosign-keys.sh   # Cosign key pair generation
-│   ├── verify-sbom.sh           # SBOM verification and extraction  
-│   └── verify-attestations.sh   # Complete attestation analysis
-├── test-sbom-local.sh           # Local SBOM testing and validation
-├── test-attestations-local.sh   # Local attestation testing
 ├── .github/
-│   ├── workflows/               # CI/CD workflows with security attestations
+│   ├── workflows/               # CI/CD workflows
 │   │   ├── on-push-master_build-push.yaml      # Master branch builds
 │   │   └── on-push-non-master_build-push.yaml  # Feature branch builds  
 │   └── actions/

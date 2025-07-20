@@ -76,17 +76,20 @@ CMD ["app"]
 
 ### Download Alpine Rootfs
 ```bash
-# Download all supported Alpine versions
+# Download all supported Alpine versions and architectures
 ./download.sh
 ```
 
 ### Build Specific Version
 ```bash
-# Build for default architecture (amd64)
-docker build --build-arg alpine_version=3.22.1 -t liskl/base:alpine-3.22.1 .
+# Build for default architecture (amd64) with latest Alpine version
+docker build -t liskl/base:alpine-3.22.1 .
 
-# Build for specific architecture
-docker build --platform linux/arm/v7 --build-arg alpine_version=3.22.1 -t liskl/base:alpine-3.22.1-armhf .
+# Build with specific Alpine version
+docker build --build-arg alpine_version=3.21.4 -t liskl/base:alpine-3.21.4 .
+
+# Build for specific architecture (requires ALPINE_ARCH to match platform)
+docker build --platform linux/arm/v7 --build-arg ALPINE_ARCH=armhf -t liskl/base:alpine-3.22.1-armhf .
 ```
 
 ### Build Multi-platform
@@ -94,19 +97,28 @@ docker build --platform linux/arm/v7 --build-arg alpine_version=3.22.1 -t liskl/
 # Setup buildx (one time)
 docker buildx create --use
 
-# Build and push multi-platform image (all architectures)
+# Build multi-platform image for all architectures
+docker buildx build \
+  --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x \
+  --build-arg alpine_version=3.22.1 \
+  -t liskl/base:alpine-3.22.1 \
+  --push .
+
+# Include riscv64 for Alpine 3.20+
 docker buildx build \
   --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x,linux/riscv64 \
   --build-arg alpine_version=3.22.1 \
   -t liskl/base:alpine-3.22.1 \
   --push .
+```
 
-# Build for specific architectures only
-docker buildx build \
-  --platform linux/amd64,linux/arm64/v8 \
-  --build-arg alpine_version=3.22.1 \
-  -t liskl/base:alpine-3.22.1 \
-  --push .
+### Local Testing
+```bash
+# Test SBOM generation and verification locally
+./test-sbom-local.sh
+
+# Test attestation generation and verification locally  
+./test-attestations-local.sh
 ```
 
 ## CI/CD
@@ -167,9 +179,16 @@ All images include comprehensive Software Bill of Materials (SBOM) for supply ch
 - **Multi-Architecture Coverage**: SBOMs generated for all supported platforms
 - **Vulnerability Scanning Ready**: Compatible with grype, snyk, and other security tools
 
-#### SBOM Verification Examples
+#### SBOM Verification Examples  
 ```bash
-# Verify SBOM attestations exist (requires cosign.pub public key)
+# Use provided verification scripts (recommended - auto-detects cosign.pub)
+./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification and extraction
+./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
+
+# Generate cosign key pair for repository setup
+./scripts/generate-cosign-keys.sh
+
+# Manual verification (requires cosign.pub public key)
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
 cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
 
@@ -180,27 +199,22 @@ cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 
 # Run vulnerability scan with grype
 grype sbom:sbom.spdx.json --fail-on critical
 
-# Verify SLSA provenance attestation
+# Verify SLSA provenance attestation  
 cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1
 
 # Extract build provenance for compliance audit
 cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpine-3.22.1 \
   | jq -r '.payload | @base64d | fromjson | .predicate' > provenance.json
-
-# Use provided verification scripts (auto-detect cosign.pub)
-./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification
-./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
-
-# Generate cosign key pair for repository setup
-./scripts/generate-cosign-keys.sh
 ```
 
-#### Required Setup
+#### Required Setup for Repository Maintainers
 1. **Generate Key Pair**: Run `./scripts/generate-cosign-keys.sh` to create signing keys
-2. **Add GitHub Secrets** (Settings > Secrets and variables > Actions > Secrets):
+2. **Configure GitHub Secrets** (Settings > Secrets and variables > Actions > Secrets):
+   - `DOCKERHUB_USERNAME`: Docker Hub username for publishing images
+   - `DOCKERHUB_TOKEN`: Docker Hub access token for authentication  
    - `COSIGN_PRIVATE_KEY`: Contents of generated `cosign.key` file
    - `COSIGN_PASSWORD`: Password used during key generation
-3. **Add GitHub Variables** (Settings > Secrets and variables > Actions > Variables):
+3. **Configure GitHub Variables** (Settings > Secrets and variables > Actions > Variables):
    - `COSIGN_PUBLIC_KEY`: Contents of generated `cosign.pub` file
 4. **Public Verification**: The public key is automatically available for verification
 
@@ -228,15 +242,23 @@ Enterprise-grade build integrity and supply chain transparency through SLSA prov
 ### Project Structure
 ```
 .
-├── Dockerfile              # Multi-platform Dockerfile
-├── download.sh             # Alpine rootfs download script
-├── rootfs/                 # Alpine minirootfs tarballs
+├── Dockerfile                    # Multi-platform Alpine base image build
+├── download.sh                   # Alpine minirootfs download script  
+├── CLAUDE.md                     # AI assistant project guidelines
+├── README.md                     # Project documentation
+├── rootfs/                       # Alpine minirootfs tarballs (3.14.3-3.22.1)
 ├── scripts/
-│   ├── verify-sbom.sh     # SBOM verification and extraction script
-│   ├── verify-attestations.sh # Complete attestation verification and analysis
-│   └── generate-cosign-keys.sh # Cosign key generation and setup
-├── .github/workflows/      # CI/CD workflows with SBOM and attestation generation
-└── CLAUDE.md              # AI assistant guidelines
+│   ├── generate-cosign-keys.sh   # Cosign key pair generation
+│   ├── verify-sbom.sh           # SBOM verification and extraction  
+│   └── verify-attestations.sh   # Complete attestation analysis
+├── test-sbom-local.sh           # Local SBOM testing and validation
+├── test-attestations-local.sh   # Local attestation testing
+├── .github/
+│   ├── workflows/               # CI/CD workflows with security attestations
+│   │   ├── on-push-master_build-push.yaml      # Master branch builds
+│   │   └── on-push-non-master_build-push.yaml  # Feature branch builds  
+│   └── actions/
+│       └── docker/              # Custom Docker action with QEMU emulation
 ```
 
 ### Contributing

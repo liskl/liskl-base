@@ -13,6 +13,10 @@ jobs:
         alpine_version: ["3.14.3", "3.15.11", "3.16.9", "3.17.10", "3.18.12", "3.19.8", "3.20.7", "3.21.4", "3.22.1"]
     steps:
     - uses: actions/checkout@v4
+    # Add support for more platforms with QEMU (optional)
+    # https://github.com/docker/setup-qemu-action
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Login to Docker Hub

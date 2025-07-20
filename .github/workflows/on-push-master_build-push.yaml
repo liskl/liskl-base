@@ -395,77 +395,112 @@ jobs:
         if [ "$SLSA_EXISTS" = "false" ]; then
           echo "Generating SLSA provenance for ${IMAGE_WITH_DIGEST}"
         
-          # Create SLSA provenance predicate using echo to avoid heredoc issues
+          # Create SLSA provenance predicate using jq for reliable JSON generation
           MANIFEST_SHA=$(echo ${MANIFEST_DIGEST} | cut -d: -f2)
           BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
-          echo '{' > /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  "_type": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  "predicateType": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  "subject": [{' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "    \"name\": \"liskl/base:alpine-${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "digest": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"sha256\": \"${MANIFEST_SHA}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  }],' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  "predicate": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "builder": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"id\": \"https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "invocation": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "configSource": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "digest": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "entryPoint": ".github/workflows/on-push-master_build-push.yaml"' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "parameters": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"alpine_version\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "ALPINE_ARCH": "multi-platform",' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"RELEASE_VERSION\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"BRANCH\": \"${{ github.ref_name }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "environment": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "github": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"actor\": \"${{ github.actor }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"event_name\": \"${{ github.event_name }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"ref\": \"${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"ref_type\": \"${{ github.ref_type }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"repository\": \"${{ github.repository }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"repository_owner\": \"${{ github.repository_owner }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"run_id\": \"${{ github.run_id }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"run_number\": \"${{ github.run_number }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"run_attempt\": \"${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "          \"sha\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "metadata": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"buildInvocationId\": \"${{ github.run_id }}-${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"buildStartedOn\": \"${{ github.event.head_commit.timestamp }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"buildFinishedOn\": \"${BUILD_TIME}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "completeness": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "parameters": true,' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "environment": true,' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '        "materials": true' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "reproducible": false' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    },' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    "materials": [{' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "digest": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    }, {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "      \"uri\": \"https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/\"," >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      "digest": {' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo "        \"description\": \"Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}\"" >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '      }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '    }]' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '  }' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
-          echo '}' >> /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+          # Create JSON using jq to ensure proper structure and validation
+          jq -n \
+            --arg type "https://slsa.dev/provenance/v0.2" \
+            --arg predicateType "https://slsa.dev/provenance/v0.2" \
+            --arg name "liskl/base:alpine-${{ matrix.alpine_version }}" \
+            --arg sha256 "${MANIFEST_SHA}" \
+            --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}" \
+            --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
+            --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
+            --arg sha1 "${{ github.sha }}" \
+            --arg entryPoint ".github/workflows/on-push-master_build-push.yaml" \
+            --arg alpineVersion "${{ matrix.alpine_version }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg eventName "${{ github.event_name }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg refType "${{ github.ref_type }}" \
+            --arg repository "${{ github.repository }}" \
+            --arg repositoryOwner "${{ github.repository_owner }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runNumber "${{ github.run_number }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg buildInvocationId "${{ github.run_id }}-${{ github.run_attempt }}" \
+            --arg buildStartedOn "${{ github.event.head_commit.timestamp }}" \
+            --arg buildFinishedOn "${BUILD_TIME}" \
+            --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
+            --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
+            '{
+              "_type": $type,
+              "predicateType": $predicateType,
+              "subject": [{
+                "name": $name,
+                "digest": {
+                  "sha256": $sha256
+                }
+              }],
+              "predicate": {
+                "builder": {
+                  "id": $builderId
+                },
+                "buildType": $buildType,
+                "invocation": {
+                  "configSource": {
+                    "uri": $uri,
+                    "digest": {
+                      "sha1": $sha1
+                    },
+                    "entryPoint": $entryPoint
+                  },
+                  "parameters": {
+                    "alpine_version": $alpineVersion,
+                    "ALPINE_ARCH": "multi-platform",
+                    "RELEASE_VERSION": $alpineVersion,
+                    "BRANCH": $branch
+                  },
+                  "environment": {
+                    "github": {
+                      "actor": $actor,
+                      "event_name": $eventName,
+                      "ref": $ref,
+                      "ref_type": $refType,
+                      "repository": $repository,
+                      "repository_owner": $repositoryOwner,
+                      "run_id": $runId,
+                      "run_number": $runNumber,
+                      "run_attempt": $runAttempt,
+                      "sha": $sha
+                    }
+                  }
+                },
+                "metadata": {
+                  "buildInvocationId": $buildInvocationId,
+                  "buildStartedOn": $buildStartedOn,
+                  "buildFinishedOn": $buildFinishedOn,
+                  "completeness": {
+                    "parameters": true,
+                    "environment": true,
+                    "materials": true
+                  },
+                  "reproducible": false
+                },
+                "materials": [{
+                  "uri": $uri,
+                  "digest": {
+                    "sha1": $sha1
+                  }
+                }, {
+                  "uri": $materialsUri,
+                  "digest": {
+                    "description": $materialsDesc
+                  }
+                }]
+              }
+            }' > /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+          
+          # Validate the JSON was created correctly
+          echo "Generated SLSA provenance JSON:"
+          cat /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
+          echo ""
+          echo "Validating JSON structure..."
+          jq '.predicate.builder.id' /tmp/slsa-provenance-${{ matrix.alpine_version }}.json
         
           # Attach SLSA provenance attestation
           cosign attest --yes \
@@ -490,78 +525,113 @@ jobs:
           if [ "$LATEST_SLSA_EXISTS" = "false" ]; then
             echo "Generating SLSA provenance for ${LATEST_IMAGE_WITH_DIGEST}"
           
-            # Create SLSA provenance for latest tag using echo to avoid heredoc issues
+            # Create SLSA provenance for latest tag using jq for reliable JSON generation
             LATEST_SHA=$(echo ${LATEST_DIGEST} | cut -d: -f2)
             LATEST_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             
-            echo '{' > /tmp/slsa-provenance-latest.json
-            echo '  "_type": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-latest.json
-            echo '  "predicateType": "https://slsa.dev/provenance/v0.2",' >> /tmp/slsa-provenance-latest.json
-            echo '  "subject": [{' >> /tmp/slsa-provenance-latest.json
-            echo '    "name": "liskl/base:latest",' >> /tmp/slsa-provenance-latest.json
-            echo '    "digest": {' >> /tmp/slsa-provenance-latest.json
-            echo "      \"sha256\": \"${LATEST_SHA}\"" >> /tmp/slsa-provenance-latest.json
-            echo '    }' >> /tmp/slsa-provenance-latest.json
-            echo '  }],' >> /tmp/slsa-provenance-latest.json
-            echo '  "predicate": {' >> /tmp/slsa-provenance-latest.json
-            echo '    "builder": {' >> /tmp/slsa-provenance-latest.json
-            echo "      \"id\": \"https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}\"" >> /tmp/slsa-provenance-latest.json
-            echo '    },' >> /tmp/slsa-provenance-latest.json
-            echo '    "buildType": "https://github.com/liskl/liskl-base/docker-build@v1",' >> /tmp/slsa-provenance-latest.json
-            echo '    "invocation": {' >> /tmp/slsa-provenance-latest.json
-            echo '      "configSource": {' >> /tmp/slsa-provenance-latest.json
-            echo "        \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-latest.json
-            echo '        "digest": {' >> /tmp/slsa-provenance-latest.json
-            echo "          \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-latest.json
-            echo '        },' >> /tmp/slsa-provenance-latest.json
-            echo '        "entryPoint": ".github/workflows/on-push-master_build-push.yaml"' >> /tmp/slsa-provenance-latest.json
-            echo '      },' >> /tmp/slsa-provenance-latest.json
-            echo '      "parameters": {' >> /tmp/slsa-provenance-latest.json
-            echo "        \"alpine_version\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-latest.json
-            echo '        "ALPINE_ARCH": "multi-platform",' >> /tmp/slsa-provenance-latest.json
-            echo "        \"RELEASE_VERSION\": \"${{ matrix.alpine_version }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "        \"BRANCH\": \"${{ github.ref_name }}\"," >> /tmp/slsa-provenance-latest.json
-            echo '        "tag": "latest"' >> /tmp/slsa-provenance-latest.json
-            echo '      },' >> /tmp/slsa-provenance-latest.json
-            echo '      "environment": {' >> /tmp/slsa-provenance-latest.json
-            echo '        "github": {' >> /tmp/slsa-provenance-latest.json
-            echo "          \"actor\": \"${{ github.actor }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"event_name\": \"${{ github.event_name }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"ref\": \"${{ github.ref }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"ref_type\": \"${{ github.ref_type }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"repository\": \"${{ github.repository }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"repository_owner\": \"${{ github.repository_owner }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"run_id\": \"${{ github.run_id }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"run_number\": \"${{ github.run_number }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"run_attempt\": \"${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "          \"sha\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-latest.json
-            echo '        }' >> /tmp/slsa-provenance-latest.json
-            echo '      }' >> /tmp/slsa-provenance-latest.json
-            echo '    },' >> /tmp/slsa-provenance-latest.json
-            echo '    "metadata": {' >> /tmp/slsa-provenance-latest.json
-            echo "      \"buildInvocationId\": \"${{ github.run_id }}-${{ github.run_attempt }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "      \"buildStartedOn\": \"${{ github.event.head_commit.timestamp }}\"," >> /tmp/slsa-provenance-latest.json
-            echo "      \"buildFinishedOn\": \"${LATEST_BUILD_TIME}\"," >> /tmp/slsa-provenance-latest.json
-            echo '      "completeness": {' >> /tmp/slsa-provenance-latest.json
-            echo '        "parameters": true,' >> /tmp/slsa-provenance-latest.json
-            echo '        "environment": true,' >> /tmp/slsa-provenance-latest.json
-            echo '        "materials": true' >> /tmp/slsa-provenance-latest.json
-            echo '      },' >> /tmp/slsa-provenance-latest.json
-            echo '      "reproducible": false' >> /tmp/slsa-provenance-latest.json
-            echo '    },' >> /tmp/slsa-provenance-latest.json
-            echo '    "materials": [{' >> /tmp/slsa-provenance-latest.json
-            echo "      \"uri\": \"git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}\"," >> /tmp/slsa-provenance-latest.json
-            echo '      "digest": {' >> /tmp/slsa-provenance-latest.json
-            echo "        \"sha1\": \"${{ github.sha }}\"" >> /tmp/slsa-provenance-latest.json
-            echo '      }' >> /tmp/slsa-provenance-latest.json
-            echo '    }, {' >> /tmp/slsa-provenance-latest.json
-            echo "      \"uri\": \"https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/\"," >> /tmp/slsa-provenance-latest.json
-            echo '      "digest": {' >> /tmp/slsa-provenance-latest.json
-            echo "        \"description\": \"Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}\"" >> /tmp/slsa-provenance-latest.json
-            echo '      }' >> /tmp/slsa-provenance-latest.json
-            echo '    }]' >> /tmp/slsa-provenance-latest.json
-            echo '  }' >> /tmp/slsa-provenance-latest.json
-            echo '}' >> /tmp/slsa-provenance-latest.json
+            # Create JSON using jq to ensure proper structure and validation
+            jq -n \
+              --arg type "https://slsa.dev/provenance/v0.2" \
+              --arg predicateType "https://slsa.dev/provenance/v0.2" \
+              --arg name "liskl/base:latest" \
+              --arg sha256 "${LATEST_SHA}" \
+              --arg builderId "https://github.com/liskl/liskl-base/.github/workflows/on-push-master_build-push.yaml@${{ github.ref }}" \
+              --arg buildType "https://github.com/liskl/liskl-base/docker-build@v1" \
+              --arg uri "git+${{ github.server_url }}/${{ github.repository }}@${{ github.ref }}" \
+              --arg sha1 "${{ github.sha }}" \
+              --arg entryPoint ".github/workflows/on-push-master_build-push.yaml" \
+              --arg alpineVersion "${{ matrix.alpine_version }}" \
+              --arg branch "${{ github.ref_name }}" \
+              --arg actor "${{ github.actor }}" \
+              --arg eventName "${{ github.event_name }}" \
+              --arg ref "${{ github.ref }}" \
+              --arg refType "${{ github.ref_type }}" \
+              --arg repository "${{ github.repository }}" \
+              --arg repositoryOwner "${{ github.repository_owner }}" \
+              --arg runId "${{ github.run_id }}" \
+              --arg runNumber "${{ github.run_number }}" \
+              --arg runAttempt "${{ github.run_attempt }}" \
+              --arg sha "${{ github.sha }}" \
+              --arg buildInvocationId "${{ github.run_id }}-${{ github.run_attempt }}" \
+              --arg buildStartedOn "${{ github.event.head_commit.timestamp }}" \
+              --arg buildFinishedOn "${LATEST_BUILD_TIME}" \
+              --arg materialsUri "https://dl-cdn.alpinelinux.org/alpine/v${{ matrix.alpine_version }}/releases/" \
+              --arg materialsDesc "Alpine Linux minirootfs archives for ${{ matrix.alpine_version }}" \
+              '{
+                "_type": $type,
+                "predicateType": $predicateType,
+                "subject": [{
+                  "name": $name,
+                  "digest": {
+                    "sha256": $sha256
+                  }
+                }],
+                "predicate": {
+                  "builder": {
+                    "id": $builderId
+                  },
+                  "buildType": $buildType,
+                  "invocation": {
+                    "configSource": {
+                      "uri": $uri,
+                      "digest": {
+                        "sha1": $sha1
+                      },
+                      "entryPoint": $entryPoint
+                    },
+                    "parameters": {
+                      "alpine_version": $alpineVersion,
+                      "ALPINE_ARCH": "multi-platform",
+                      "RELEASE_VERSION": $alpineVersion,
+                      "BRANCH": $branch,
+                      "tag": "latest"
+                    },
+                    "environment": {
+                      "github": {
+                        "actor": $actor,
+                        "event_name": $eventName,
+                        "ref": $ref,
+                        "ref_type": $refType,
+                        "repository": $repository,
+                        "repository_owner": $repositoryOwner,
+                        "run_id": $runId,
+                        "run_number": $runNumber,
+                        "run_attempt": $runAttempt,
+                        "sha": $sha
+                      }
+                    }
+                  },
+                  "metadata": {
+                    "buildInvocationId": $buildInvocationId,
+                    "buildStartedOn": $buildStartedOn,
+                    "buildFinishedOn": $buildFinishedOn,
+                    "completeness": {
+                      "parameters": true,
+                      "environment": true,
+                      "materials": true
+                    },
+                    "reproducible": false
+                  },
+                  "materials": [{
+                    "uri": $uri,
+                    "digest": {
+                      "sha1": $sha1
+                    }
+                  }, {
+                    "uri": $materialsUri,
+                    "digest": {
+                      "description": $materialsDesc
+                    }
+                  }]
+                }
+              }' > /tmp/slsa-provenance-latest.json
+            
+            # Validate the JSON was created correctly
+            echo "Generated SLSA provenance JSON for latest:"
+            cat /tmp/slsa-provenance-latest.json
+            echo ""
+            echo "Validating JSON structure..."
+            jq '.predicate.builder.id' /tmp/slsa-provenance-latest.json
           
             # Attach SLSA provenance to latest tag
             cosign attest --yes \

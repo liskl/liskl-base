@@ -19,9 +19,11 @@ echo "2) Build arm64 only"
 echo "3) Build amd64 + arm64 (common platforms)"
 echo "4) Build all architectures"
 echo "5) Test with attestation verification"
-echo "6) Custom build"
+echo "6) Test architecture emulation (existing images)"
+echo "7) Build all + test emulation"
+echo "8) Custom build"
 
-read -p "Enter choice (1-6): " choice
+read -p "Enter choice (1-8): " choice
 
 case $choice in
     1)
@@ -46,11 +48,20 @@ case $choice in
         ./build-local.sh -a amd64 -t
         ;;
     6)
+        echo -e "${BLUE}Testing architecture emulation...${NC}"
+        ./build-local.sh -e
+        ;;
+    7)
+        echo -e "${BLUE}Building all architectures and testing emulation...${NC}"
+        ./build-local.sh -e
+        ;;
+    8)
         echo -e "${YELLOW}Custom build options:${NC}"
         echo "Examples:"
         echo "  ./build-local.sh -v 3.21.4 -a arm64    # Specific version and arch"
         echo "  ./build-local.sh -A                     # All versions"
         echo "  ./build-local.sh -p -t                  # Push and test"
+        echo "  ./build-local.sh -e                     # Test emulation"
         echo ""
         echo "Run './build-local.sh --help' for full options"
         ;;

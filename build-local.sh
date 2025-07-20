@@ -11,6 +11,7 @@ BUILD_SINGLE_ARCH=""
 BUILD_ALL_VERSIONS=false
 PUSH_IMAGES=false
 TEST_ATTESTATIONS=false
+TEST_EMULATION=false
 REGISTRY_PREFIX="liskl/base"
 
 # Color output
@@ -33,6 +34,7 @@ OPTIONS:
     -A, --all-versions      Build all supported Alpine versions
     -p, --push              Push images to registry after building
     -t, --test-attestations Test attestation verification after build
+    -e, --test-emulation    Test Docker Desktop architecture emulation capabilities
     -r, --registry PREFIX   Registry prefix (default: $REGISTRY_PREFIX)
     -h, --help              Show this help message
 
@@ -42,6 +44,7 @@ EXAMPLES:
     $0 -a arm64                          # Build only arm64 architecture
     $0 -A                                # Build all Alpine versions
     $0 -p -t                             # Build, push, and test attestations
+    $0 -e                                # Test architecture emulation capabilities
     $0 -r myregistry/alpine              # Use custom registry prefix
 
 SUPPORTED ARCHITECTURES:
@@ -80,6 +83,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t|--test-attestations)
             TEST_ATTESTATIONS=true
+            shift
+            ;;
+        -e|--test-emulation)
+            TEST_EMULATION=true
             shift
             ;;
         -r|--registry)
@@ -244,6 +251,104 @@ test_attestations() {
             echo -e "${YELLOW}⚠ Shell stdin test also failed${NC}"
         fi
     fi
+    
+    # Test 8: Architecture emulation test (Docker Desktop QEMU)
+    echo -e "${BLUE}Testing Docker Desktop architecture emulation...${NC}"
+    arch_from_tag=$(echo "$tag" | sed 's/.*-\([^-]*\)$/\1/')
+    
+    # Test basic command execution across architecture
+    emulation_test=$(docker run --rm --entrypoint="" "$tag" /bin/echo "Emulation test for $arch_from_tag" 2>/dev/null)
+    if [[ "$emulation_test" == "Emulation test for $arch_from_tag" ]]; then
+        echo -e "${GREEN}✓ Architecture emulation working for $arch_from_tag${NC}"
+        
+        # Additional emulation stress test
+        if docker run --rm --entrypoint="" "$tag" /bin/test -f /bin/sh >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ Complex emulation operations work${NC}"
+        else
+            echo -e "${YELLOW}⚠ Some emulation operations may be limited${NC}"
+        fi
+    else
+        echo -e "${RED}✗ Architecture emulation failed for $arch_from_tag${NC}"
+        echo -e "${YELLOW}  This architecture may not be supported by Docker Desktop${NC}"
+    fi
+}
+
+# Function to test architecture emulation capabilities
+test_architecture_emulation() {
+    echo -e "\n${GREEN}=== Docker Desktop Architecture Emulation Test ===${NC}"
+    echo -e "${BLUE}Testing which architectures can run on this Docker Desktop instance...${NC}\n"
+    
+    local arch_results=()
+    local supported_count=0
+    local total_count=0
+    
+    # Test all built images
+    for tag in $(docker images --format "table {{.Repository}}:{{.Tag}}" | grep "test-alpine.*-" | grep -v "REPOSITORY"); do
+        if [[ "$tag" =~ test-alpine-.*-([^-]+)$ ]]; then
+            local arch="${BASH_REMATCH[1]}"
+            local platform=""
+            
+            # Map architecture to platform for display
+            case "$arch" in
+                "amd64") platform="linux/amd64 (native)" ;;
+                "386") platform="linux/386" ;;
+                "arm64") platform="linux/arm64/v8" ;;
+                "armv7") platform="linux/arm/v7" ;;
+                "armv6") platform="linux/arm/v6" ;;
+                "riscv64") platform="linux/riscv64" ;;
+                "ppc64le") platform="linux/ppc64le" ;;
+                "s390x") platform="linux/s390x" ;;
+                *) platform="unknown" ;;
+            esac
+            
+            echo -e "${BLUE}Testing $arch ($platform):${NC}"
+            
+            # Test basic execution
+            local test_output=$(docker run --rm --entrypoint="" "$tag" /bin/echo "Test $arch" 2>/dev/null)
+            if [[ "$test_output" == "Test $arch" ]]; then
+                # Test Alpine version access
+                local alpine_ver=$(docker run --rm --entrypoint="" "$tag" /bin/cat /etc/alpine-release 2>/dev/null)
+                local build_info=$(docker run --rm --entrypoint="" "$tag" /bin/cat /etc/build_release 2>/dev/null | head -1)
+                
+                if [[ -n "$alpine_ver" && -n "$build_info" ]]; then
+                    echo -e "  ${GREEN}✅ $arch: FULLY FUNCTIONAL${NC}"
+                    echo -e "  ${BLUE}     Alpine: $alpine_ver | $build_info${NC}"
+                    arch_results+=("✅ $arch")
+                    ((supported_count++))
+                else
+                    echo -e "  ${YELLOW}⚠ $arch: BASIC EXECUTION ONLY${NC}"
+                    arch_results+=("⚠ $arch")
+                fi
+            else
+                echo -e "  ${RED}❌ $arch: NOT SUPPORTED${NC}"
+                arch_results+=("❌ $arch")
+            fi
+            ((total_count++))
+            echo ""
+        fi
+    done
+    
+    # Summary
+    echo -e "${GREEN}=== EMULATION CAPABILITY SUMMARY ===${NC}"
+    echo -e "${BLUE}Supported architectures: $supported_count/$total_count${NC}\n"
+    
+    for result in "${arch_results[@]}"; do
+        echo "  $result"
+    done
+    
+    echo ""
+    if [[ $supported_count -eq $total_count ]]; then
+        echo -e "${GREEN}🎉 AMAZING: Docker Desktop supports ALL tested architectures!${NC}"
+        echo -e "${BLUE}You can test any architecture locally before CI/CD deployment.${NC}"
+    elif [[ $supported_count -gt 5 ]]; then
+        echo -e "${GREEN}🚀 EXCELLENT: Docker Desktop supports most architectures!${NC}"
+        echo -e "${BLUE}You have comprehensive local testing capabilities.${NC}"
+    elif [[ $supported_count -gt 2 ]]; then
+        echo -e "${YELLOW}👍 GOOD: Docker Desktop supports common architectures.${NC}"
+    else
+        echo -e "${YELLOW}📝 LIMITED: Docker Desktop has basic emulation support.${NC}"
+    fi
+    echo ""
 }
 
 # Function to build multi-platform manifest
@@ -324,6 +429,25 @@ if ! command -v docker &> /dev/null || ! docker buildx version &> /dev/null; the
     exit 1
 fi
 
+# Handle emulation-only testing
+if [[ "$TEST_EMULATION" == "true" ]]; then
+    # Check if any test images exist
+    if ! docker images | grep -q "test-alpine.*-"; then
+        echo -e "${YELLOW}No test images found. Building a few architectures for emulation testing...${NC}"
+        echo -e "${BLUE}Building AMD64, ARM64, and RISC-V for emulation test...${NC}\n"
+        
+        # Build a representative set of architectures
+        for arch_pair in "linux/amd64:x86_64:amd64" "linux/arm64/v8:aarch64:arm64" "linux/riscv64:riscv64:riscv64"; do
+            IFS=':' read -r platform alpine_arch tag_suffix <<< "$arch_pair"
+            build_arch "$platform" "$alpine_arch" "$tag_suffix" "$ALPINE_VERSION" "false"
+        done
+        echo ""
+    fi
+    
+    test_architecture_emulation
+    exit 0
+fi
+
 # Single architecture build
 if [[ -n "$BUILD_SINGLE_ARCH" ]]; then
     # Find platform for requested architecture
@@ -371,6 +495,11 @@ if [[ "$BUILD_ALL_VERSIONS" == "true" ]]; then
 else
     echo -e "${BLUE}Building Alpine ${ALPINE_VERSION} with all architectures...${NC}"
     build_multiplatform "$ALPINE_VERSION" "$PUSH_IMAGES"
+fi
+
+# Run architecture emulation test if requested
+if [[ "$TEST_EMULATION" == "true" ]]; then
+    test_architecture_emulation
 fi
 
 echo -e "\n${GREEN}Build script completed!${NC}"

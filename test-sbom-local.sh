@@ -40,13 +40,11 @@ mkdir -p /tmp/sbom-test
 
 echo "   Generating SPDX format..."
 syft liskl-base-test:sbom-test \
-  --output spdx-json \
-  --file /tmp/sbom-test/test-spdx.json
+  --output spdx-json=/tmp/sbom-test/test-spdx.json
 
 echo "   Generating CycloneDX format..."
 syft liskl-base-test:sbom-test \
-  --output cyclonedx-json \
-  --file /tmp/sbom-test/test-cyclonedx.json
+  --output cyclonedx-json=/tmp/sbom-test/test-cyclonedx.json
 
 echo "✓ SBOMs generated"
 echo ""

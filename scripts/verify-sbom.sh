@@ -91,11 +91,11 @@ echo ""
 # Generate local SBOM for comparison
 echo "3. Generating local SBOM for comparison..."
 echo "   Creating SPDX SBOM..."
-syft "$IMAGE" --output spdx-json --file /tmp/sbom-verification/local-spdx.json
+syft "$IMAGE" --output spdx-json=/tmp/sbom-verification/local-spdx.json
 echo "   ✓ Local SPDX SBOM created at /tmp/sbom-verification/local-spdx.json"
 
 echo "   Creating CycloneDX SBOM..."
-syft "$IMAGE" --output cyclonedx-json --file /tmp/sbom-verification/local-cyclonedx.json
+syft "$IMAGE" --output cyclonedx-json=/tmp/sbom-verification/local-cyclonedx.json
 echo "   ✓ Local CycloneDX SBOM created at /tmp/sbom-verification/local-cyclonedx.json"
 
 # Display local SBOM summary

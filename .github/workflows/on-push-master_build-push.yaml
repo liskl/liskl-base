@@ -256,13 +256,11 @@ jobs:
         echo "Generating SBOM for ${IMAGE_WITH_DIGEST}"
         
         syft "${IMAGE_WITH_DIGEST}" \
-          --output spdx-json \
-          --file /tmp/sbom-${{ matrix.alpine_version }}.spdx.json
+          --output spdx-json=/tmp/sbom-${{ matrix.alpine_version }}.spdx.json
         
         # Also generate CycloneDX format for broader tool compatibility
         syft "${IMAGE_WITH_DIGEST}" \
-          --output cyclonedx-json \
-          --file /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json
+          --output cyclonedx-json=/tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json
         
         # Upload SBOM as attestation using cosign with private key
         cosign attest --yes \
@@ -285,12 +283,10 @@ jobs:
           
           # Generate SBOMs for latest tag using digest
           syft "${LATEST_IMAGE_WITH_DIGEST}" \
-            --output spdx-json \
-            --file /tmp/sbom-latest.spdx.json
+            --output spdx-json=/tmp/sbom-latest.spdx.json
           
           syft "${LATEST_IMAGE_WITH_DIGEST}" \
-            --output cyclonedx-json \
-            --file /tmp/sbom-latest.cyclonedx.json
+            --output cyclonedx-json=/tmp/sbom-latest.cyclonedx.json
           
           # Attach SBOMs to latest tag using digest
           cosign attest --yes \

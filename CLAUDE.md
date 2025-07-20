@@ -90,20 +90,28 @@ The resulting Docker image:
 
 ### Security Verification
 ```bash
-# Verify SBOM attestations
-cosign verify-attestation --type spdx liskl/base:alpine-3.22.1
-cosign verify-attestation --type cyclonedx liskl/base:alpine-3.22.1
+# Verify SBOM attestations (requires cosign.pub public key)
+cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
+cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
 
 # Extract SBOM for vulnerability scanning
-cosign verify-attestation --type spdx liskl/base:alpine-3.22.1 \
+cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 \
   | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
 
 # Run vulnerability scan
 grype sbom:sbom.spdx.json --fail-on critical
 
-# Use verification script
+# Use verification script (auto-detects cosign.pub)
 ./scripts/verify-sbom.sh alpine-3.22.1
+
+# Generate cosign key pair for signing
+./scripts/generate-cosign-keys.sh
 ```
+
+### Required GitHub Secrets
+- **COSIGN_PRIVATE_KEY**: Private key for signing SBOMs (from cosign.key)
+- **COSIGN_PASSWORD**: Password for the private key
+- **COSIGN_PUBLIC_KEY** (optional): Public key for verification documentation
 
 ## Commit Message Format
 

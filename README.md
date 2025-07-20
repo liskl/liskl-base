@@ -169,20 +169,30 @@ All images include comprehensive Software Bill of Materials (SBOM) for supply ch
 
 #### SBOM Verification Examples
 ```bash
-# Verify SBOM attestations exist
-cosign verify-attestation --type spdx liskl/base:alpine-3.22.1
-cosign verify-attestation --type cyclonedx liskl/base:alpine-3.22.1
+# Verify SBOM attestations exist (requires cosign.pub public key)
+cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
+cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
 
 # Extract SBOM for vulnerability scanning
-cosign verify-attestation --type spdx liskl/base:alpine-3.22.1 \
+cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1 \
   | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
 
 # Run vulnerability scan with grype
 grype sbom:sbom.spdx.json --fail-on critical
 
-# Use provided verification script
+# Use provided verification script (auto-detects cosign.pub)
 ./scripts/verify-sbom.sh alpine-3.22.1
+
+# Generate cosign key pair for repository setup
+./scripts/generate-cosign-keys.sh
 ```
+
+#### Required Setup
+1. **Generate Key Pair**: Run `./scripts/generate-cosign-keys.sh` to create signing keys
+2. **Add GitHub Secrets**:
+   - `COSIGN_PRIVATE_KEY`: Contents of generated `cosign.key` file
+   - `COSIGN_PASSWORD`: Password used during key generation
+3. **Public Verification**: Share `cosign.pub` for SBOM verification
 
 ### Security Features (Planned)
 - **Build Attestations** (Issue #12): SLSA provenance attestations for build integrity verification and enterprise compliance

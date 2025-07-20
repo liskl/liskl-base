@@ -42,8 +42,8 @@ jobs:
         context: .
         platforms: linux/386
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-386
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -57,8 +57,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -72,8 +72,8 @@ jobs:
         context: .
         platforms: linux/arm/v6
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv6
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -87,8 +87,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv7
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -102,8 +102,8 @@ jobs:
         context: .
         platforms: linux/arm64/v8
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -117,8 +117,8 @@ jobs:
         context: .
         platforms: linux/ppc64le
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-ppc64le
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -132,8 +132,8 @@ jobs:
         context: .
         platforms: linux/s390x
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-s390x
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -149,8 +149,8 @@ jobs:
         context: .
         platforms: linux/riscv64
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-riscv64
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
@@ -158,40 +158,20 @@ jobs:
           alpine_version=${{ matrix.alpine_version }}
           ALPINE_ARCH=riscv64
     
-    # Create multi-platform manifests
-    - name: Create and push multi-platform manifest
-      run: |
-        # Create base manifest with all common architectures
-        docker manifest create liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-386 \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64 \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv6 \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv7 \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm64 \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-ppc64le \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-s390x
-        
-        # Add riscv64 for Alpine 3.20+
-        if [[ "${{ matrix.alpine_version }}" =~ ^3\.(2[0-9]|[3-9][0-9])\. ]]; then
-          docker manifest rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
-          docker manifest create liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-386 \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-amd64 \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv6 \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-armv7 \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-arm64 \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-ppc64le \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-s390x \
-            liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-riscv64
-        fi
-        
-        # Check if manifest already exists before pushing
-        if docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
-          echo "ℹ Manifest liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} already exists, skipping push"
-        else
-          docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
-          echo "✓ Manifest liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} pushed successfully"
-        fi
+    # Create multi-platform manifest with attestations using buildx
+    - name: Build and push multi-platform manifest with attestations
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x${{ contains(fromJSON('["3.20.7", "3.21.4", "3.22.1"]'), matrix.alpine_version) && ',linux/riscv64' || '' }}
+        push: true
+        provenance: true
+        sbom: true
+        tags: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+        build-args: |
+          RELEASE_VERSION=${{ matrix.alpine_version }}
+          BRANCH=${{ env.SHORT_SHA }}
+          alpine_version=${{ matrix.alpine_version }}
     
     # Get manifest digest for secure signing
     - name: Get manifest digest

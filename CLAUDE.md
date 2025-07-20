@@ -226,6 +226,47 @@ ci: migrate workflows to Docker Hub
   - `chore/<name>`: For maintenance and housekeeping tasks
   - `fix/<name>`: For bug fixes and patches
 
+## Issue Work and Branch Management
+
+### Branch Creation Best Practices
+
+**IMPORTANT**: All issue work should be done on fresh branches that are:
+- ✅ **Based on `origin/master`**: Always start from the latest master branch
+- ✅ **Up-to-date**: Ensure your local master is synced with `origin/master`
+- ✅ **Clean start**: Create new branch immediately after syncing
+
+#### Recommended Workflow
+```bash
+# 1. Switch to master and sync with origin
+git checkout master
+git pull origin master
+
+# 2. Create new feature branch immediately
+git checkout -b feat/your-feature-name
+
+# 3. Work on your feature
+# ... make changes, commits, etc.
+
+# 4. Before creating PR, rebase if needed
+git fetch origin
+git rebase origin/master
+
+# 5. Push and create PR
+git push -u origin feat/your-feature-name
+```
+
+#### Why This Matters
+- **Prevents Conflicts**: Starting from latest master reduces merge conflicts
+- **Clean History**: Linear commit history that's easy to review
+- **Easier Rebasing**: Fewer complications when resolving conflicts
+- **Consistent Base**: All team members work from same foundation
+
+#### Common Pitfalls to Avoid
+- ❌ Creating branches from outdated local master
+- ❌ Working on branches that are many commits behind master
+- ❌ Merging instead of rebasing when conflicts arise
+- ❌ Creating branches from other feature branches
+
 ## File Reference Quick Guide
 
 ### When working with builds:

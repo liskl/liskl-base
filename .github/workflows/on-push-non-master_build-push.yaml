@@ -90,7 +90,7 @@ jobs:
         echo "::notice::Testing built image: liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test"
         
         # Test the locally built image
-        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test echo "Architecture test successful for Alpine ${{ matrix.alpine_version }}"
+        docker run --rm liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}-test /bin/sh -c "echo 'Architecture test successful for Alpine ${{ matrix.alpine_version }}'"
         
         echo "::notice::✅ Image test completed successfully for Alpine ${{ matrix.alpine_version }}"
     

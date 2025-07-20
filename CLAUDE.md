@@ -13,6 +13,31 @@ This is a Docker base image project that creates minimal Alpine Linux containers
 - **rootfs/**: Contains Alpine Linux minirootfs tarballs (versions 3.14.3 through 3.22.1 for all architectures)
 - **GitHub Actions**: Automated CI/CD workflows for building and publishing Docker images
 
+## Key Files
+
+### Core Build Files
+- `Dockerfile`: Multi-architecture Alpine base image build (FROM scratch, uses minirootfs tarballs)
+- `download.sh`: Downloads Alpine minirootfs archives for all architectures
+- `build-local.sh`: Local testing script with multi-arch, attestation, and emulation testing
+- `test-build.sh`: Quick interactive Docker image testing script
+
+### Security & Verification Scripts
+- `scripts/verify-sbom.sh`: SBOM verification script for cosign attestations
+- `scripts/verify-attestations.sh`: Complete attestation analysis script  
+- `scripts/generate-cosign-keys.sh`: Cosign key pair generation for SBOM signing
+- `test-sbom-local.sh`: Local SBOM testing and validation
+- `test-attestations-local.sh`: Local attestation testing and verification
+
+### CI/CD Workflows
+- `.github/workflows/on-push-master_build-push.yaml`: Master branch workflow (builds all Alpine versions)
+- `.github/workflows/on-push-non-master_build-push.yaml`: Feature branch workflow (builds with commit SHA tags)
+- `.github/actions/docker/`: Custom Docker action for multi-arch builds with QEMU emulation
+
+### Rootfs Archives
+- `rootfs/alpine-minirootfs-{version}-{arch}.tar.gz`: Alpine Linux minirootfs tarballs
+  - Versions: 3.14.3, 3.15.11, 3.16.9, 3.17.10, 3.18.12, 3.19.8, 3.20.7, 3.21.4, 3.22.1
+  - Architectures: x86, x86_64, armv7, armhf, aarch64, ppc64le, s390x (3.20+ includes riscv64)
+
 ## Build Commands
 
 ### Docker Image Building
@@ -66,10 +91,20 @@ Both workflows publish to Docker Hub with full multi-architecture support.
 
 ## Build Arguments
 
-- `RELEASE_VERSION`: Alpine version or commit SHA (set by CI)
-- `BRANCH`: Git branch name or commit SHA (set by CI)  
+### Dockerfile Arguments (Dockerfile:5-12)
+- `RELEASE_VERSION`: Alpine version or commit SHA (set by CI, default: unknown)
+- `BRANCH`: Git branch name or commit SHA (set by CI, default: unknown)  
 - `alpine_version`: Alpine Linux version (default: 3.22.1)
-- `ALPINE_ARCH`: Target Alpine architecture name
+- `ALPINE_ARCH`: Target Alpine architecture name (passed from build system)
+
+### build-local.sh Options (build-local.sh:25-49)
+- `-v, --version VERSION`: Alpine version to build (default: 3.22.1)
+- `-a, --arch ARCH`: Build single architecture only (amd64, arm64, etc.)
+- `-A, --all-versions`: Build all supported Alpine versions
+- `-p, --push`: Push images to registry after building
+- `-t, --test-attestations`: Test attestation verification after build
+- `-e, --test-emulation`: Test Docker Desktop architecture emulation capabilities
+- `-r, --registry PREFIX`: Registry prefix (default: liskl/base)
 
 ### Supported Architectures
 
@@ -118,6 +153,16 @@ The resulting Docker image:
 
 ### Security Verification
 ```bash
+# Use verification scripts (auto-detect cosign.pub) - RECOMMENDED
+./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification (scripts/verify-sbom.sh:8-30)
+./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
+./scripts/generate-cosign-keys.sh              # Generate cosign key pair for signing
+
+# Local testing scripts
+./test-sbom-local.sh                           # Local SBOM testing and validation
+./test-attestations-local.sh                  # Local attestation testing and verification
+
+# Manual verification commands
 # Verify cosign SBOM attestations (requires cosign.pub public key)
 cosign verify-attestation --key cosign.pub --type spdx liskl/base:alpine-3.22.1
 cosign verify-attestation --key cosign.pub --type cyclonedx liskl/base:alpine-3.22.1
@@ -139,18 +184,13 @@ cosign verify-attestation --key cosign.pub --type slsaprovenance liskl/base:alpi
 
 # Run vulnerability scan
 grype sbom:sbom.spdx.json --fail-on critical
-
-# Use verification scripts (auto-detect cosign.pub)
-./scripts/verify-sbom.sh alpine-3.22.1          # SBOM verification
-./scripts/verify-attestations.sh alpine-3.22.1  # Complete attestation analysis
-
-# Generate cosign key pair for signing
-./scripts/generate-cosign-keys.sh
 ```
 
 ### Required GitHub Configuration
 
-#### GitHub Secrets (Private)
+#### GitHub Secrets (Private) - Required for CI/CD workflows
+- **DOCKERHUB_USERNAME**: Docker Hub username for image publishing (.github/workflows/*:25)
+- **DOCKERHUB_TOKEN**: Docker Hub access token for authentication (.github/workflows/*:26)
 - **COSIGN_PRIVATE_KEY**: Private key for signing SBOMs (from cosign.key)
 - **COSIGN_PASSWORD**: Password for the private key
 
@@ -194,3 +234,28 @@ ci: migrate workflows to Docker Hub
   - `feat/<name>`: For new feature development
   - `chore/<name>`: For maintenance and housekeeping tasks
   - `fix/<name>`: For bug fixes and patches
+
+## File Reference Quick Guide
+
+### When working with builds:
+- Main build file: `Dockerfile` (lines 1-25, FROM scratch Alpine build)
+- Local testing: `build-local.sh` (comprehensive build script with multi-arch support)
+- Quick testing: `test-build.sh` (simple interactive testing)
+- Download Alpine archives: `download.sh`
+
+### When working with security/attestations:
+- SBOM verification: `scripts/verify-sbom.sh` (requires cosign, syft tools)
+- Attestation analysis: `scripts/verify-attestations.sh`
+- Key generation: `scripts/generate-cosign-keys.sh`
+- Local testing: `test-sbom-local.sh`, `test-attestations-local.sh`
+
+### When working with CI/CD:
+- Master workflow: `.github/workflows/on-push-master_build-push.yaml` (builds all Alpine versions)
+- Feature workflow: `.github/workflows/on-push-non-master_build-push.yaml` (commit SHA tags)
+- Custom action: `.github/actions/docker/` (multi-arch with QEMU)
+
+### When checking Alpine versions/architectures:
+- Available versions: 3.14.3, 3.15.11, 3.16.9, 3.17.10, 3.18.12, 3.19.8, 3.20.7, 3.21.4, 3.22.1
+- Base architectures (all versions): x86, x86_64, armv7, armhf, aarch64, ppc64le, s390x
+- Conditional architecture: riscv64 (Alpine 3.20+ only)
+- Archive location: `rootfs/alpine-minirootfs-{version}-{arch}.tar.gz`

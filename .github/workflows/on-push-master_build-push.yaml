@@ -43,8 +43,8 @@ jobs:
         context: .
         platforms: linux/386
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-386
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-386' || '' }}
@@ -60,8 +60,8 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-amd64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-amd64' || '' }}
@@ -77,8 +77,8 @@ jobs:
         context: .
         platforms: linux/arm/v6
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-armv6
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-armv6' || '' }}
@@ -94,8 +94,8 @@ jobs:
         context: .
         platforms: linux/arm/v7
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-armv7
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-armv7' || '' }}
@@ -111,8 +111,8 @@ jobs:
         context: .
         platforms: linux/arm64/v8
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-arm64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-arm64' || '' }}
@@ -128,8 +128,8 @@ jobs:
         context: .
         platforms: linux/ppc64le
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-ppc64le
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-ppc64le' || '' }}
@@ -145,8 +145,8 @@ jobs:
         context: .
         platforms: linux/s390x
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-s390x
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-s390x' || '' }}
@@ -164,8 +164,8 @@ jobs:
         context: .
         platforms: linux/riscv64
         push: true
-        provenance: true
-        sbom: true
+        provenance: false
+        sbom: false
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}-riscv64
           ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest-riscv64' || '' }}
@@ -175,68 +175,22 @@ jobs:
           alpine_version=${{ matrix.alpine_version }}
           ALPINE_ARCH=riscv64
     
-    # Create multi-platform manifests
-    - name: Create and push multi-platform manifest
-      run: |
-        # Create base manifest with all common architectures
-        docker manifest create liskl/base:alpine-${{ matrix.alpine_version }} \
-          liskl/base:alpine-${{ matrix.alpine_version }}-386 \
-          liskl/base:alpine-${{ matrix.alpine_version }}-amd64 \
-          liskl/base:alpine-${{ matrix.alpine_version }}-armv6 \
-          liskl/base:alpine-${{ matrix.alpine_version }}-armv7 \
-          liskl/base:alpine-${{ matrix.alpine_version }}-arm64 \
-          liskl/base:alpine-${{ matrix.alpine_version }}-ppc64le \
-          liskl/base:alpine-${{ matrix.alpine_version }}-s390x
-        
-        # Add riscv64 for Alpine 3.20+
-        if [[ "${{ matrix.alpine_version }}" =~ ^3\.(2[0-9]|[3-9][0-9])\. ]]; then
-          docker manifest create liskl/base:alpine-${{ matrix.alpine_version }}-temp \
-            liskl/base:alpine-${{ matrix.alpine_version }}-386 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-amd64 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-armv6 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-armv7 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-arm64 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-ppc64le \
-            liskl/base:alpine-${{ matrix.alpine_version }}-s390x \
-            liskl/base:alpine-${{ matrix.alpine_version }}-riscv64
-          docker manifest rm liskl/base:alpine-${{ matrix.alpine_version }}
-          docker manifest create liskl/base:alpine-${{ matrix.alpine_version }} \
-            liskl/base:alpine-${{ matrix.alpine_version }}-386 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-amd64 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-armv6 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-armv7 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-arm64 \
-            liskl/base:alpine-${{ matrix.alpine_version }}-ppc64le \
-            liskl/base:alpine-${{ matrix.alpine_version }}-s390x \
-            liskl/base:alpine-${{ matrix.alpine_version }}-riscv64
-        fi
-        
-        # Check if manifest already exists before pushing
-        if docker manifest inspect liskl/base:alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
-          echo "ℹ Manifest liskl/base:alpine-${{ matrix.alpine_version }} already exists, skipping push"
-        else
-          docker manifest push liskl/base:alpine-${{ matrix.alpine_version }}
-          echo "✓ Manifest liskl/base:alpine-${{ matrix.alpine_version }} pushed successfully"
-        fi
-        
-        # Create latest manifest for Alpine 3.22.1
-        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          if docker manifest inspect liskl/base:latest >/dev/null 2>&1; then
-            echo "ℹ Manifest liskl/base:latest already exists, skipping creation"
-          else
-            docker manifest create liskl/base:latest \
-              liskl/base:latest-386 \
-              liskl/base:latest-amd64 \
-              liskl/base:latest-armv6 \
-              liskl/base:latest-armv7 \
-              liskl/base:latest-arm64 \
-              liskl/base:latest-ppc64le \
-              liskl/base:latest-s390x \
-              liskl/base:latest-riscv64
-            docker manifest push liskl/base:latest
-            echo "✓ Manifest liskl/base:latest pushed successfully"
-          fi
-        fi
+    # Create multi-platform manifest with attestations using buildx
+    - name: Build and push multi-platform manifest with attestations
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x${{ contains(fromJSON('["3.20.7", "3.21.4", "3.22.1"]'), matrix.alpine_version) && ',linux/riscv64' || '' }}
+        push: true
+        provenance: true
+        sbom: true
+        tags: |
+          liskl/base:alpine-${{ matrix.alpine_version }}
+          ${{ matrix.alpine_version == '3.22.1' && 'liskl/base:latest' || '' }}
+        build-args: |
+          RELEASE_VERSION=${{ matrix.alpine_version }}
+          BRANCH=${{ env.BRANCH }}
+          alpine_version=${{ matrix.alpine_version }}
     
     # Get manifest digest for secure signing
     - name: Get manifest digest

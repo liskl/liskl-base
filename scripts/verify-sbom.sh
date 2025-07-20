@@ -6,7 +6,13 @@
 set -e
 
 IMAGE_TAG=${1:-"alpine-3.22.1"}
-IMAGE="liskl/base:${IMAGE_TAG}"
+
+# Support both tag and digest formats
+if [[ "${IMAGE_TAG}" == *"@sha256:"* ]]; then
+    IMAGE="${IMAGE_TAG}"
+else
+    IMAGE="liskl/base:${IMAGE_TAG}"
+fi
 
 echo "SBOM Verification for ${IMAGE}"
 echo "================================"

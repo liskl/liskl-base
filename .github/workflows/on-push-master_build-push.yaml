@@ -32,6 +32,7 @@ jobs:
     
     # Build all base architectures (available for all Alpine versions)
     - name: Build and push linux/386 image
+      id: build-386
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -221,53 +222,72 @@ jobs:
           docker manifest push liskl/base:latest
         fi
     
+    # Get manifest digest for secure signing
+    - name: Get manifest digest
+      id: digest
+      run: |
+        # Get digest for the multi-platform manifest
+        DIGEST=$(docker manifest inspect liskl/base:alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}')
+        echo "MANIFEST_DIGEST=${DIGEST}" >> $GITHUB_ENV
+        echo "Image digest: ${DIGEST}"
+        
+        # Get digest for latest tag if this is Alpine 3.22.1
+        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
+          LATEST_DIGEST=$(docker manifest inspect liskl/base:latest | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:latest --format '{{.Manifest.Digest}}')
+          echo "LATEST_DIGEST=${LATEST_DIGEST}" >> $GITHUB_ENV
+          echo "Latest digest: ${LATEST_DIGEST}"
+        fi
+    
     # Generate SBOM and attach as attestation
     - name: Generate and attach SBOM
       run: |
-        # Generate SBOM for the multi-platform image
-        echo "Generating SBOM for liskl/base:alpine-${{ matrix.alpine_version }}"
-        syft liskl/base:alpine-${{ matrix.alpine_version }} \
+        # Generate SBOM for the multi-platform image using digest
+        IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
+        echo "Generating SBOM for ${IMAGE_WITH_DIGEST}"
+        
+        syft "${IMAGE_WITH_DIGEST}" \
           --output spdx-json \
           --file /tmp/sbom-${{ matrix.alpine_version }}.spdx.json
         
         # Also generate CycloneDX format for broader tool compatibility
-        syft liskl/base:alpine-${{ matrix.alpine_version }} \
+        syft "${IMAGE_WITH_DIGEST}" \
           --output cyclonedx-json \
           --file /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json
         
-        # Upload SBOM as attestation using cosign (keyless signing)
+        # Upload SBOM as attestation using cosign with digest (keyless signing)
         cosign attest --yes \
           --predicate /tmp/sbom-${{ matrix.alpine_version }}.spdx.json \
           --type spdx \
-          liskl/base:alpine-${{ matrix.alpine_version }}
+          "${IMAGE_WITH_DIGEST}"
         
         # Also attach CycloneDX SBOM
         cosign attest --yes \
           --predicate /tmp/sbom-${{ matrix.alpine_version }}.cyclonedx.json \
           --type cyclonedx \
-          liskl/base:alpine-${{ matrix.alpine_version }}
+          "${IMAGE_WITH_DIGEST}"
         
         # Generate SBOM for latest tag (Alpine 3.22.1 only)
         if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          echo "Generating SBOM for liskl/base:latest"
+          LATEST_IMAGE_WITH_DIGEST="liskl/base@${LATEST_DIGEST}"
+          echo "Generating SBOM for ${LATEST_IMAGE_WITH_DIGEST}"
           
-          # Generate SBOMs for latest tag
-          syft liskl/base:latest \
+          # Generate SBOMs for latest tag using digest
+          syft "${LATEST_IMAGE_WITH_DIGEST}" \
             --output spdx-json \
             --file /tmp/sbom-latest.spdx.json
           
-          syft liskl/base:latest \
+          syft "${LATEST_IMAGE_WITH_DIGEST}" \
             --output cyclonedx-json \
             --file /tmp/sbom-latest.cyclonedx.json
           
-          # Attach SBOMs to latest tag
+          # Attach SBOMs to latest tag using digest
           cosign attest --yes \
             --predicate /tmp/sbom-latest.spdx.json \
             --type spdx \
-            liskl/base:latest
+            "${LATEST_IMAGE_WITH_DIGEST}"
           
           cosign attest --yes \
             --predicate /tmp/sbom-latest.cyclonedx.json \
             --type cyclonedx \
-            liskl/base:latest
+            "${LATEST_IMAGE_WITH_DIGEST}"
         fi

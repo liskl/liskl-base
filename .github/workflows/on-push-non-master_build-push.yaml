@@ -182,28 +182,39 @@ jobs:
         
         docker manifest push liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
     
+    # Get manifest digest for secure signing
+    - name: Get manifest digest
+      id: digest
+      run: |
+        # Get digest for the development multi-platform manifest
+        DIGEST=$(docker manifest inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} | jq -r '.config.digest // .mediaType as $type | if $type == "application/vnd.docker.distribution.manifest.list.v2+json" then .manifests[0].digest else .config.digest end' 2>/dev/null || docker buildx imagetools inspect liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} --format '{{.Manifest.Digest}}')
+        echo "MANIFEST_DIGEST=${DIGEST}" >> $GITHUB_ENV
+        echo "Development image digest: ${DIGEST}"
+    
     # Generate SBOM and attach as attestation for development images
     - name: Generate and attach SBOM
       run: |
-        # Generate SBOM for the development multi-platform image
-        echo "Generating SBOM for liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
-        syft liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
+        # Generate SBOM for the development multi-platform image using digest
+        IMAGE_WITH_DIGEST="liskl/base@${MANIFEST_DIGEST}"
+        echo "Generating SBOM for ${IMAGE_WITH_DIGEST}"
+        
+        syft "${IMAGE_WITH_DIGEST}" \
           --output spdx-json \
           --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json
         
         # Also generate CycloneDX format for broader tool compatibility
-        syft liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }} \
+        syft "${IMAGE_WITH_DIGEST}" \
           --output cyclonedx-json \
           --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json
         
-        # Upload SBOM as attestation using cosign (keyless signing)
+        # Upload SBOM as attestation using cosign with digest (keyless signing)
         cosign attest --yes \
           --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json \
           --type spdx \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+          "${IMAGE_WITH_DIGEST}"
         
         # Also attach CycloneDX SBOM
         cosign attest --yes \
           --predicate /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json \
           --type cyclonedx \
-          liskl/base:${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}
+          "${IMAGE_WITH_DIGEST}"

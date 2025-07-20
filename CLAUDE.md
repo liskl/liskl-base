@@ -83,9 +83,10 @@ The resulting Docker image:
 - **SPDX format**: Industry-standard SBOM format for compliance
 - **CycloneDX format**: Enhanced tool compatibility and ecosystem support  
 - **Automated generation**: Generated for every image during CI/CD builds
-- **Cosign attestation**: Cryptographically signed and attached to images
+- **Cosign attestation**: Cryptographically signed using image digests (not tags)
 - **Multi-architecture coverage**: SBOMs for all supported platforms
 - **Vulnerability ready**: Compatible with grype, snyk, and other scanners
+- **Secure signing**: Uses image digests to prevent tag substitution attacks
 
 ### Security Verification
 ```bash
@@ -133,3 +134,11 @@ fix: correct armhf build argument handling
 docs: update README with new build instructions
 ci: migrate workflows to Docker Hub
 ```
+
+## Branch Namespacing Guidelines
+
+- Ensure consistent branch naming using namespaces aligned with commitlint prefixes:
+  - `docs/<name>`: For documentation-related branches
+  - `feat/<name>`: For new feature development
+  - `chore/<name>`: For maintenance and housekeeping tasks
+  - `fix/<name>`: For bug fixes and patches

@@ -31,26 +31,28 @@ jobs:
     # Safety check: Verify feature branch tag doesn't conflict with immutable patterns
     - name: Verify tag safety
       id: verify_tag
+      env:
+        DEBUG: ${{ runner.debug == '1' && 'true' || 'false' }}
       run: |
         TAG="${{ env.SHORT_SHA }}-alpine-${{ matrix.alpine_version }}"
-        echo "Verifying safety of tag: $TAG"
+        echo "::notice::Verifying safety of feature branch tag: $TAG"
         
-        # Check if tag accidentally matches immutable pattern (should never happen)
-        if ./scripts/check-immutable-tags.sh --quiet "$TAG"; then
-          echo "✅ Tag $TAG: Safe to push (mutable pattern)"
+        # Use enhanced logging script for safety verification
+        if ./scripts/check-immutable-tags.sh "$TAG"; then
           echo "is_safe=true" >> $GITHUB_OUTPUT
         else
           exit_code=$?
           if [ $exit_code -eq 1 ]; then
-            echo "::error::❌ Tag $TAG unexpectedly matches immutable pattern and exists!"
+            echo "::error::Critical: Feature branch tag unexpectedly matches immutable pattern!"
+            echo "::error::Tag $TAG should be mutable but was detected as immutable and existing."
             echo "::error::This indicates a serious issue with tag generation logic."
             echo "is_safe=false" >> $GITHUB_OUTPUT
             exit 1
           elif [ $exit_code -eq 2 ]; then
-            echo "::warning::⚠️ API error checking tag $TAG, proceeding anyway (feature branch)"
+            echo "::warning::API error during tag safety check - proceeding with feature branch build"
             echo "is_safe=true" >> $GITHUB_OUTPUT
           else
-            echo "::error::❌ Unexpected exit code $exit_code from tag check"
+            echo "::error::Unexpected exit code $exit_code from tag safety check"
             exit 1
           fi
         fi

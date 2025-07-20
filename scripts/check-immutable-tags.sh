@@ -46,7 +46,10 @@ EXIT CODES:
 EOF
 }
 
-# Logging functions
+# GitHub Actions detection
+GITHUB_ACTIONS="${GITHUB_ACTIONS:-false}"
+
+# Logging functions with GitHub Actions annotations support
 log_debug() {
     if [[ "$DEBUG" == "true" ]]; then
         echo -e "${BLUE}[DEBUG]${NC} $*" >&2
@@ -56,17 +59,86 @@ log_debug() {
 log_info() {
     if [[ "${QUIET:-false}" != "true" ]]; then
         echo -e "${GREEN}[INFO]${NC} $*" >&2
+        if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+            echo "::notice::$*"
+        fi
     fi
 }
 
 log_warn() {
     if [[ "${QUIET:-false}" != "true" ]]; then
         echo -e "${YELLOW}[WARN]${NC} $*" >&2
+        if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+            echo "::warning::$*"
+        fi
     fi
 }
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $*" >&2
+    if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+        echo "::error::$*"
+    fi
+}
+
+# GitHub Actions grouping functions
+log_group_start() {
+    local title="$1"
+    if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+        echo "::group::$title"
+    else
+        log_info "=== $title ==="
+    fi
+}
+
+log_group_end() {
+    if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+        echo "::endgroup::"
+    fi
+}
+
+# Enhanced debug logging for API operations
+log_api_debug() {
+    local operation="$1"
+    local url="$2"
+    local response_code="${3:-unknown}"
+    local details="${4:-}"
+    
+    if [[ "$DEBUG" == "true" ]]; then
+        echo -e "${BLUE}[API-DEBUG]${NC} $operation: $url (HTTP $response_code)" >&2
+        if [[ -n "$details" ]]; then
+            echo -e "${BLUE}[API-DEBUG]${NC} Details: $details" >&2
+        fi
+    fi
+}
+
+# Structured logging for tag analysis
+log_tag_analysis() {
+    local tag="$1"
+    local is_immutable="$2"
+    local exists="$3"
+    local decision="$4"
+    local reason="${5:-}"
+    
+    local message="Tag analysis: $tag | Immutable: $is_immutable | Exists: $exists | Decision: $decision"
+    if [[ -n "$reason" ]]; then
+        message="$message | Reason: $reason"
+    fi
+    
+    case "$decision" in
+        "SKIP")
+            log_warn "$message"
+            ;;
+        "PUSH")
+            log_info "$message"
+            ;;
+        "ERROR")
+            log_error "$message"
+            ;;
+        *)
+            log_debug "$message"
+            ;;
+    esac
 }
 
 # Check if tag matches immutable pattern
@@ -94,33 +166,39 @@ tag_exists_on_dockerhub() {
     local auth_url="https://auth.docker.io/token?service=registry.docker.io&scope=repository:${registry}:pull"
     local token_response
     
-    log_debug "Getting auth token from: $auth_url"
+    log_api_debug "AUTH_REQUEST" "$auth_url" "pending" "Requesting Docker Hub authentication token"
     
     if ! token_response=$(curl -s -f "$auth_url" 2>/dev/null); then
-        log_debug "Failed to get authentication token from Docker Hub"
+        log_api_debug "AUTH_REQUEST" "$auth_url" "failed" "Could not retrieve authentication token"
+        log_error "Failed to get authentication token from Docker Hub for $registry:$tag"
         return 2  # API error
     fi
+    
+    log_api_debug "AUTH_REQUEST" "$auth_url" "200" "Authentication token received successfully"
     
     local token
     if command -v jq >/dev/null 2>&1; then
         token=$(echo "$token_response" | jq -r '.token')
+        log_debug "Token extracted using jq"
     else
         # Fallback parsing without jq
         token=$(echo "$token_response" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+        log_debug "Token extracted using sed fallback (jq not available)"
     fi
     
     if [[ -z "$token" || "$token" == "null" ]]; then
-        log_debug "Failed to extract token from auth response"
+        log_api_debug "AUTH_PARSE" "$auth_url" "error" "Token extraction failed from response"
+        log_error "Failed to extract token from Docker Hub auth response for $registry:$tag"
         return 2
     fi
     
-    log_debug "Successfully obtained auth token"
+    log_debug "Successfully obtained and parsed auth token"
     
     # Step 2: Check if the tag exists using the manifest endpoint
     local manifest_url="https://registry-1.docker.io/v2/${registry}/manifests/${tag}"
     local response_code
     
-    log_debug "Checking manifest at: $manifest_url"
+    log_api_debug "MANIFEST_CHECK" "$manifest_url" "pending" "Checking if manifest exists"
     
     # Use HEAD request to check if manifest exists (more efficient)
     response_code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -128,7 +206,7 @@ tag_exists_on_dockerhub() {
         -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
         "$manifest_url" 2>/dev/null)
     
-    log_debug "HTTP response code: $response_code"
+    log_api_debug "MANIFEST_CHECK" "$manifest_url" "$response_code" "Manifest check completed"
     
     case "$response_code" in
         200)
@@ -140,11 +218,19 @@ tag_exists_on_dockerhub() {
             return 1
             ;;
         401|403)
-            log_debug "Authentication failed or access denied"
+            log_error "Authentication failed or access denied for $registry:$tag (HTTP $response_code)"
+            return 2
+            ;;
+        429)
+            log_warn "Rate limit exceeded for Docker Hub API (HTTP $response_code)"
+            return 2
+            ;;
+        5??)
+            log_error "Docker Hub server error (HTTP $response_code) for $registry:$tag"
             return 2
             ;;
         *)
-            log_debug "Unexpected response code: $response_code"
+            log_error "Unexpected HTTP response code: $response_code for $registry:$tag"
             return 2
             ;;
     esac
@@ -162,32 +248,45 @@ check_tag() {
     local is_immutable="false"
     if is_immutable_pattern "$tag"; then
         is_immutable="true"
+        log_debug "Tag '$tag' matches immutable pattern"
+    else
+        log_debug "Tag '$tag' does not match immutable pattern"
     fi
     
     # Check if tag exists (only if it matches immutable pattern)
     local exists="false"
     local should_skip="false"
     local api_error="false"
+    local decision=""
+    local reason=""
     
     if [[ "$is_immutable" == "true" ]]; then
         case $(tag_exists_on_dockerhub "$registry" "$tag"; echo $?) in
             0)
                 exists="true"
                 should_skip="true"
-                log_warn "Tag $registry:$tag is immutable and exists - should skip push"
+                decision="SKIP"
+                reason="immutable tag exists on Docker Hub"
+                log_tag_analysis "$tag" "$is_immutable" "$exists" "$decision" "$reason"
                 ;;
             1)
                 exists="false"
                 should_skip="false"
-                log_info "Tag $registry:$tag is immutable but doesn't exist - can push"
+                decision="PUSH"
+                reason="immutable tag doesn't exist yet"
+                log_tag_analysis "$tag" "$is_immutable" "$exists" "$decision" "$reason"
                 ;;
             2)
                 api_error="true"
-                log_error "API error checking tag $registry:$tag"
+                decision="ERROR"
+                reason="Docker Hub API failure"
+                log_tag_analysis "$tag" "$is_immutable" "unknown" "$decision" "$reason"
                 ;;
         esac
     else
-        log_info "Tag $registry:$tag is mutable - can push"
+        decision="PUSH"
+        reason="mutable tag pattern"
+        log_tag_analysis "$tag" "$is_immutable" "n/a" "$decision" "$reason"
     fi
     
     # Build result object
@@ -199,18 +298,27 @@ check_tag() {
     "is_immutable_pattern": $is_immutable,
     "exists_on_dockerhub": $exists,
     "should_skip_push": $should_skip,
-    "api_error": $api_error
+    "api_error": $api_error,
+    "decision": "$decision",
+    "reason": "$reason"
 }
 EOF
         )
     else
-        if [[ "$should_skip" == "true" ]]; then
-            result="SKIP $registry:$tag (immutable and exists)"
-        elif [[ "$api_error" == "true" ]]; then
-            result="ERROR $registry:$tag (API failure)"
-        else
-            result="PUSH $registry:$tag"
-        fi
+        case "$decision" in
+            "SKIP")
+                result="SKIP $registry:$tag ($reason)"
+                ;;
+            "ERROR")
+                result="ERROR $registry:$tag ($reason)"
+                ;;
+            "PUSH")
+                result="PUSH $registry:$tag ($reason)"
+                ;;
+            *)
+                result="UNKNOWN $registry:$tag"
+                ;;
+        esac
     fi
     
     echo "$result"
@@ -276,12 +384,20 @@ main() {
     log_debug "Registry: $registry"
     log_debug "Tags to check: ${tags[*]}"
     log_debug "Output format: $OUTPUT_FORMAT"
+    log_debug "GitHub Actions mode: $GITHUB_ACTIONS"
+    
+    # Start grouped logging for tag checking
+    log_group_start "Immutable Tag Analysis for $registry"
+    log_info "Analyzing ${#tags[@]} tag(s) for immutability and Docker Hub existence"
     
     # Check each tag
     local results=()
     local overall_exit_code=0
     local has_api_errors=false
     local has_skips=false
+    local push_count=0
+    local skip_count=0
+    local error_count=0
     
     for tag in "${tags[@]}"; do
         local result
@@ -290,6 +406,7 @@ main() {
         # Capture result even if function returns non-zero exit code
         if result=$(check_tag "$registry" "$tag"); then
             exit_code=0
+            push_count=$((push_count + 1))
         else
             exit_code=$?
         fi
@@ -299,12 +416,16 @@ main() {
         case $exit_code in
             1)
                 has_skips=true
+                skip_count=$((skip_count + 1))
                 ;;
             2)
                 has_api_errors=true
+                error_count=$((error_count + 1))
                 ;;
         esac
     done
+    
+    log_group_end
     
     # Output results
     if [[ "$OUTPUT_FORMAT" == "json" ]]; then
@@ -320,6 +441,9 @@ main() {
         echo "  ],"
         echo "  \"summary\": {"
         echo "    \"total_tags\": ${#tags[@]},"
+        echo "    \"push_count\": $push_count,"
+        echo "    \"skip_count\": $skip_count,"
+        echo "    \"error_count\": $error_count,"
         echo "    \"has_skips\": $has_skips,"
         echo "    \"has_api_errors\": $has_api_errors"
         echo "  }"
@@ -329,13 +453,33 @@ main() {
             echo "$result"
         done
         
-        # Summary
-        if [[ "$has_skips" == "true" ]]; then
-            log_warn "Some tags should be skipped due to immutability"
+        # Enhanced summary with counts
+        log_group_start "Analysis Summary"
+        log_info "Tag analysis complete: $push_count push, $skip_count skip, $error_count error (total: ${#tags[@]})"
+        
+        if [[ "$push_count" -gt 0 ]]; then
+            log_info "✓ $push_count tag(s) are safe to push"
         fi
-        if [[ "$has_api_errors" == "true" ]]; then
-            log_error "Some API errors occurred"
+        
+        if [[ "$skip_count" -gt 0 ]]; then
+            log_warn "⚠ $skip_count tag(s) should be skipped (immutable and exist)"
         fi
+        
+        if [[ "$error_count" -gt 0 ]]; then
+            log_error "✗ $error_count tag(s) had API errors during checking"
+        fi
+        
+        # Set GitHub Actions outputs for workflow integration
+        if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+            echo "push_count=$push_count" >> "$GITHUB_OUTPUT"
+            echo "skip_count=$skip_count" >> "$GITHUB_OUTPUT"
+            echo "error_count=$error_count" >> "$GITHUB_OUTPUT"
+            echo "has_skips=$has_skips" >> "$GITHUB_OUTPUT"
+            echo "has_api_errors=$has_api_errors" >> "$GITHUB_OUTPUT"
+            log_debug "GitHub Actions outputs set for downstream workflow steps"
+        fi
+        
+        log_group_end
     fi
     
     # Determine exit code

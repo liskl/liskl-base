@@ -12,9 +12,8 @@ ARG TARGETVARIANT
 # ALPINE_ARCH can be explicitly set or auto-detected from TARGETARCH
 ARG ALPINE_ARCH
 
-# Copy our rootfs files and extraction script
+# Copy our rootfs files
 COPY ./rootfs ./rootfs
-COPY ./copy-rootfs.sh ./copy-rootfs.sh
 
 # Create directory for extracted rootfs and run extraction
 RUN mkdir -p /extracted_rootfs && \

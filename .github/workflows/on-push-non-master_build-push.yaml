@@ -209,13 +209,11 @@ jobs:
         echo "Generating SBOM for ${IMAGE_WITH_DIGEST}"
         
         syft "${IMAGE_WITH_DIGEST}" \
-          --output spdx-json \
-          --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json
+          --output spdx-json=/tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.spdx.json
         
         # Also generate CycloneDX format for broader tool compatibility
         syft "${IMAGE_WITH_DIGEST}" \
-          --output cyclonedx-json \
-          --file /tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json
+          --output cyclonedx-json=/tmp/sbom-${{ env.SHORT_SHA }}-${{ matrix.alpine_version }}.cyclonedx.json
         
         # Upload SBOM as attestation using cosign with private key
         cosign attest --yes \

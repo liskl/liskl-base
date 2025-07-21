@@ -210,7 +210,9 @@ docker buildx imagetools inspect liskl/base:alpine-3.22.1 --format '{{json .Prov
 ├── CLAUDE.md                     # AI assistant project guidelines
 ├── README.md                     # Project documentation
 ├── rootfs/                       # Alpine minirootfs tarballs (3.14.3-3.22.1)
-├── scripts/                      # (Empty directory, reserved for future use)
+├── scripts/                      # CI/CD utility scripts
+│   ├── check-immutable-tags.sh  # Docker Hub immutable tag detection
+│   └── test-check-immutable-tags.sh # Unit tests for tag detection
 └── .github/
     ├── workflows/               # CI/CD workflows with BuildKit attestations
     │   ├── on-push-master_build-push.yaml      # Master branch builds

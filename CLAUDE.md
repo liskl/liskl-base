@@ -81,8 +81,36 @@ docker buildx build --platform linux/amd64,linux/arm64/v8 --build-arg alpine_ver
 
 The project uses GitHub Actions with two workflows:
 
-1. **Master Branch** (on-push-master_build-push.yaml): Builds and pushes multi-architecture images for all Alpine versions
-2. **Feature Branches** (on-push-non-master_build-push.yaml): Builds and pushes development images tagged with commit SHA
+### Master Branch Workflow (Docker Hub Publishing)
+Uses a **hybrid build strategy** for optimal Docker Hub image ordering:
+
+**Build Stages:**
+1. **Legacy Versions (Parallel)**: Versions 3.14.3 through 3.21.4 build simultaneously for speed (~10-15 minutes)
+2. **Current Version (Sequential)**: Latest Alpine version (3.22.1) builds after legacy completion (~3-5 minutes)
+3. **Latest Tag (Sequential)**: `latest` tag builds last for proper Docker Hub ordering (~3-5 minutes)
+
+**Benefits:**
+- **Fast Build Times**: Total ~15-25 minutes vs ~60-90 minutes for full sequential
+- **Predictable Ordering**: Current version and latest tag consistently appear last on Docker Hub
+- **Resource Efficient**: Maximum parallelization where order doesn't matter
+
+### Non-Master Branch Workflow (Testing Only)
+Uses **parallel matrix strategy** for fast testing:
+- All versions build simultaneously for speed
+- No Docker Hub push, so ordering doesn't matter
+- Focus on validation and testing
+
+### Version Management
+- **Legacy Versions**: Older Alpine versions (3.14.3-3.21.4) built in parallel matrix
+- **Current Version**: Newest stable Alpine version (currently 3.22.1) built sequentially
+- **Latest Tag**: Always points to current version, appears last on Docker Hub
+
+### Adding New Alpine Versions
+1. Add new version to legacy matrix in **master workflow only** 
+2. Move previous current version to legacy matrix
+3. Update current version job to use new version
+4. Update documentation to reflect new current version
+5. **Non-master workflow**: Keep parallel matrix (can be updated or left as-is)
 
 Both workflows publish to Docker Hub with full multi-architecture support.
 

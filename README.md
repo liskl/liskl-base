@@ -116,9 +116,25 @@ docker buildx build \
 
 This repository uses GitHub Actions for automated building and publishing:
 
-- **Master Branch**: Builds and publishes all Alpine versions as production images
+- **Master Branch**: Builds and publishes all Alpine versions as production images using hybrid build strategy
 - **Feature Branches**: Builds development images tagged with commit SHA
 - **Manual Triggers**: Workflows can be triggered manually via GitHub Actions UI
+
+### Docker Hub Image Ordering
+
+Images appear on Docker Hub in build completion order. The master branch uses a **hybrid build strategy** to ensure proper ordering:
+
+- **Legacy versions** (3.14.3-3.21.4): Built in parallel for speed
+- **Current version** (3.22.1): Built sequentially after legacy versions  
+- **Latest tag**: Built last to appear at the end of the image list
+
+**Result**: The most relevant images (current version and latest) appear at the end of Docker Hub listings in predictable order.
+
+### Build Performance
+- **Legacy Versions**: ~10-15 minutes (parallel)
+- **Current Version**: ~3-5 minutes (sequential) 
+- **Latest Tag**: ~3-5 minutes (sequential)
+- **Total Time**: ~15-25 minutes with proper ordering
 
 ### Build Matrix
 Each workflow run builds:

@@ -6,11 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-container:
+  # Stage 1: Build legacy versions in parallel for speed
+  build-legacy-versions:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        alpine_version: ["3.14.3", "3.15.11", "3.16.9", "3.17.10", "3.18.12", "3.19.8", "3.20.7", "3.21.4", "3.22.1"]
+        alpine_version: ["3.14.3", "3.15.11", "3.16.9", "3.17.10", "3.18.12", "3.19.8", "3.20.7", "3.21.4"]
     steps:
     - uses: actions/checkout@v4
     # Add support for more platforms with QEMU (optional)
@@ -34,36 +35,16 @@ jobs:
       env:
         DEBUG: ${{ runner.debug == '1' && 'true' || 'false' }}
       run: |
-        # Prepare tags to check
-        TAGS_TO_CHECK="alpine-${{ matrix.alpine_version }}"
-        if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-          TAGS_TO_CHECK="$TAGS_TO_CHECK latest"
-        fi
-        
-        echo "::notice::Checking immutable tag status for: $TAGS_TO_CHECK"
+        echo "::notice::Checking immutable tag status for: alpine-${{ matrix.alpine_version }}"
         
         # Use enhanced logging script with GitHub Actions integration
-        if ./scripts/check-immutable-tags.sh $TAGS_TO_CHECK; then
+        if ./scripts/check-immutable-tags.sh alpine-${{ matrix.alpine_version }}; then
           echo "should_push=true" >> $GITHUB_OUTPUT
-          echo "should_push_alpine=true" >> $GITHUB_OUTPUT
-          if [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-            echo "should_push_latest=true" >> $GITHUB_OUTPUT
-          fi
         else
           exit_code=$?
           if [ $exit_code -eq 1 ]; then
-            # Some tags should be skipped - check which ones
-            if ./scripts/check-immutable-tags.sh alpine-${{ matrix.alpine_version }} >/dev/null 2>&1; then
-              # Alpine tag is OK, latest might be the issue
-              echo "should_push=true" >> $GITHUB_OUTPUT
-              echo "should_push_alpine=true" >> $GITHUB_OUTPUT
-              echo "should_push_latest=false" >> $GITHUB_OUTPUT
-            else
-              # Alpine tag should be skipped
-              echo "should_push=false" >> $GITHUB_OUTPUT
-              echo "should_push_alpine=false" >> $GITHUB_OUTPUT
-              echo "should_push_latest=false" >> $GITHUB_OUTPUT
-            fi
+            # Tag should be skipped
+            echo "should_push=false" >> $GITHUB_OUTPUT
           else
             echo "::error::API error occurred during tag checking (exit code: $exit_code)"
             exit 1
@@ -76,13 +57,12 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x${{ contains(fromJSON('["3.20.7", "3.21.4", "3.22.1"]'), matrix.alpine_version) && ',linux/riscv64' || '' }}
+        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x${{ contains(fromJSON('["3.20.7", "3.21.4"]'), matrix.alpine_version) && ',linux/riscv64' || '' }}
         push: true
         provenance: true
         sbom: true
         tags: |
           liskl/base:alpine-${{ matrix.alpine_version }}
-          ${{ matrix.alpine_version == '3.22.1' && steps.check_tags.outputs.should_push_latest == 'true' && 'liskl/base:latest' || '' }}
         build-args: |
           RELEASE_VERSION=${{ matrix.alpine_version }}
           BRANCH=${{ env.BRANCH }}
@@ -93,12 +73,145 @@ jobs:
       run: |
         if [ "${{ steps.check_tags.outputs.should_push }}" = "true" ]; then
           echo "::notice::✅ Successfully built and pushed alpine-${{ matrix.alpine_version }}"
-          if [ "${{ matrix.alpine_version }}" = "3.22.1" ] && [ "${{ steps.check_tags.outputs.should_push_latest }}" = "true" ]; then
-            echo "::notice::✅ Successfully built and pushed latest tag"
-          elif [ "${{ matrix.alpine_version }}" = "3.22.1" ]; then
-            echo "::notice::ℹ️ Skipped latest tag (already exists)"
-          fi
         else
           echo "::notice::⏭️ Skipped build for alpine-${{ matrix.alpine_version }} (tag already exists)"
+        fi
+
+  # Stage 2: Build current Alpine version sequentially after legacy versions
+  build-current-version:
+    needs: build-legacy-versions
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    # Add support for more platforms with QEMU (optional)
+    # https://github.com/docker/setup-qemu-action
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Extract branch name
+      id: extract_branch
+      run: echo "BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_ENV
+    
+    # Check if current version tag is immutable and already exists on Docker Hub
+    - name: Check immutable tag status
+      id: check_tags
+      env:
+        DEBUG: ${{ runner.debug == '1' && 'true' || 'false' }}
+      run: |
+        echo "::notice::Checking immutable tag status for: alpine-3.22.1"
+        
+        # Use enhanced logging script with GitHub Actions integration
+        if ./scripts/check-immutable-tags.sh alpine-3.22.1; then
+          echo "should_push=true" >> $GITHUB_OUTPUT
+        else
+          exit_code=$?
+          if [ $exit_code -eq 1 ]; then
+            # Tag should be skipped
+            echo "should_push=false" >> $GITHUB_OUTPUT
+          else
+            echo "::error::API error occurred during tag checking (exit code: $exit_code)"
+            exit 1
+          fi
+        fi
+    
+    # Build and push current Alpine version
+    - name: Build and push current Alpine version
+      if: steps.check_tags.outputs.should_push == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x,linux/riscv64
+        push: true
+        provenance: true
+        sbom: true
+        tags: |
+          liskl/base:alpine-3.22.1
+        build-args: |
+          RELEASE_VERSION=3.22.1
+          BRANCH=${{ env.BRANCH }}
+          alpine_version=3.22.1
+    
+    # Summary step for current version
+    - name: Build summary
+      run: |
+        if [ "${{ steps.check_tags.outputs.should_push }}" = "true" ]; then
+          echo "::notice::✅ Successfully built and pushed alpine-3.22.1"
+        else
+          echo "::notice::⏭️ Skipped build for alpine-3.22.1 (tag already exists)"
+        fi
+
+  # Stage 3: Build latest tag sequentially after current version
+  build-latest-tag:
+    needs: build-current-version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    # Add support for more platforms with QEMU (optional)
+    # https://github.com/docker/setup-qemu-action
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Extract branch name
+      id: extract_branch
+      run: echo "BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_ENV
+    
+    # Check if latest tag is immutable and already exists on Docker Hub
+    - name: Check immutable tag status
+      id: check_tags
+      env:
+        DEBUG: ${{ runner.debug == '1' && 'true' || 'false' }}
+      run: |
+        echo "::notice::Checking immutable tag status for: latest"
+        
+        # Use enhanced logging script with GitHub Actions integration
+        if ./scripts/check-immutable-tags.sh latest; then
+          echo "should_push=true" >> $GITHUB_OUTPUT
+        else
+          exit_code=$?
+          if [ $exit_code -eq 1 ]; then
+            # Tag should be skipped
+            echo "should_push=false" >> $GITHUB_OUTPUT
+          else
+            echo "::error::API error occurred during tag checking (exit code: $exit_code)"
+            exit 1
+          fi
+        fi
+    
+    # Build and push latest tag
+    - name: Build and push latest tag
+      if: steps.check_tags.outputs.should_push == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x,linux/riscv64
+        push: true
+        provenance: true
+        sbom: true
+        tags: |
+          liskl/base:latest
+        build-args: |
+          RELEASE_VERSION=3.22.1
+          BRANCH=${{ env.BRANCH }}
+          alpine_version=3.22.1
+    
+    # Summary step for latest tag
+    - name: Build summary
+      run: |
+        if [ "${{ steps.check_tags.outputs.should_push }}" = "true" ]; then
+          echo "::notice::✅ Successfully built and pushed latest tag"
+        else
+          echo "::notice::⏭️ Skipped build for latest tag (already exists)"
         fi
     
